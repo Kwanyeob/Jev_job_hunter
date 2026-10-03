@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -25,7 +27,11 @@ def _home() -> Path:
 
 def _active_port_candidates() -> list[Path]:
     home = _home()
+    local = Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local")
     return [
+        local / "Google/Chrome/User Data/DevToolsActivePort",
+        local / "Google/Chrome SxS/User Data/DevToolsActivePort",
+        local / "Chromium/User Data/DevToolsActivePort",
         home / "Library/Application Support/Google/Chrome/DevToolsActivePort",
         home / "Library/Application Support/Google/Chrome Canary/DevToolsActivePort",
         home / "Library/Application Support/Google/Chrome for Testing/DevToolsActivePort",
@@ -101,6 +107,51 @@ def resolve_browser_endpoint() -> tuple[int, str]:
     if not ws:
         raise ChromeError(f"no CDP websocket on port {port}")
     return port, ws
+
+
+DEFAULT_CDP_PORT = 9222
+
+
+def _chrome_exe() -> str | None:
+    env = (os.environ.get("JJH_CHROME") or "").strip()
+    local = os.environ.get("LOCALAPPDATA") or ""
+    for p in (env,
+              r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+              r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+              os.path.join(local, r"Google\Chrome\Application\chrome.exe") if local else "",
+              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+        if p and os.path.isfile(p):
+            return p
+    return shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chrome")
+
+
+def ensure_chrome(root: Path, timeout: float = 20.0) -> str:
+    """Reuse a debuggable Chrome, else start a separate visible one (own profile, logged out)."""
+    try:
+        resolve_browser_endpoint()
+        return "attached"
+    except ChromeError:
+        pass
+    port = int((os.environ.get("JJH_CDP_PORT") or "").strip() or DEFAULT_CDP_PORT)
+    os.environ["JJH_CDP_PORT"] = str(port)
+    if _browser_ws_from_json(port):
+        return "attached"
+    exe = _chrome_exe()
+    if not exe:
+        raise ChromeError("Chrome not found (set JJH_CHROME to chrome.exe)")
+    profile = root / "state" / "chrome-profile"
+    profile.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen(
+        [exe, f"--remote-debugging-port={port}", f"--user-data-dir={profile}",
+         "--no-first-run", "--no-default-browser-check", "about:blank"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _browser_ws_from_json(port):
+            return "launched"
+        time.sleep(0.5)
+    raise ChromeError(f"started Chrome but no CDP on port {port}")
 
 
 def _browser_ws_from_json(port: int) -> str | None:

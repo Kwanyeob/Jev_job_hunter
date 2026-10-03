@@ -1,0 +1,21 @@
+# Built from a resume by the host agent (see skills/jev-job-hunter/SKILL.md → LinkedIn).
+# Copy to config/profile.yaml (git-ignored). No name, email, phone, or links:
+# everything under `candidate` is sent to Jev.
+candidate:
+  headline: Backend Engineer, 4 years Python / Go
+  summary: >-
+    Backend engineer who built payment and search APIs at a fintech startup.
+    Recently shipped LLM-powered internal tools and wants AI product work.
+  years_experience: 4
+  seniority: mid            # intern | entry | mid | senior | staff
+  skills: [Python, Go, PostgreSQL, Kafka, AWS, Docker, Kubernetes, FastAPI, LLM APIs]
+  target_roles: [Backend Engineer, AI Engineer, Platform Engineer]
+  interests: [LLM applications, Developer tools, Distributed systems]
+  locations: [Seoul, Remote]
+  languages: [Korean, English]
+
+search:
+  queries: [Backend Engineer, AI Engineer]   # LinkedIn keywords, one search each
+  location: South Korea
+  remote: any               # any | remote | hybrid | onsite
+  posted: week              # day | week | month | any

@@ -6,11 +6,11 @@ import hashlib, json, os, re, time
 from dataclasses import dataclass, field
 
 from jev_job_hunter.questions import (
-    DETAIL_NOULS, JOB_POSTING_THRESHOLD, JOB_TEXT_LIMIT, MAX_CONTROLS_TO_SCORE,
+    DETAIL_NOULS, FIT_NOULS, JOB_POSTING_THRESHOLD, JOB_TEXT_LIMIT, MAX_CONTROLS_TO_SCORE,
     MAX_JOB_FILTER, MAX_LINKS_TO_SCORE, MIN_JOB_LINKS, PAGE_KIND_CRITERIA,
     PAGE_KIND_INSTRUCTIONS, apply_filter_instructions, browse_more_instructions,
     is_ai_related_instructions, is_job_posting_instructions,
-    is_software_related_instructions, leads_to_jobs_instructions,
+    is_software_related_instructions, leads_to_jobs_instructions, open_card_instructions,
 )
 
 API_URL = "https://api.typesafe.ai/v1/systemone"
@@ -150,6 +150,30 @@ def build_detail_questions() -> dict:
     return {k: {"type": "noul", "instructions": v} for k, v in DETAIL_NOULS.items()}
 
 
+def build_card_questions(cards: list[dict]) -> dict:
+    return {f"open_{i}": {"type": "noul", "instructions": open_card_instructions(i, c.get("title"), c.get("company"))}
+            for i, c in enumerate(cards)}
+
+
+def card_state(profile: dict, query: str, cards: list[dict]) -> dict:
+    return {
+        "candidate_profile": profile,
+        "hunt_query": query or "",
+        "jobs": [{"i": i, "title": c.get("title") or "", "company": c.get("company") or "",
+                  "location": c.get("location") or ""} for i, c in enumerate(cards)],
+    }
+
+
+def build_fit_questions() -> dict:
+    return {k: {"type": "noul", "instructions": v} for k, v in FIT_NOULS.items()}
+
+
+def fit_state(profile: dict, card: dict, url: str, text: str) -> dict:
+    return {"candidate_profile": profile, "job": {
+        "title": card.get("title") or "", "company": card.get("company") or "",
+        "location": card.get("location") or "", "url": url, "text": text[:JOB_TEXT_LIMIT]}}
+
+
 def build_control_questions(controls: list[dict]) -> dict:
     qs = {}
     for i, c in enumerate(controls[:MAX_CONTROLS_TO_SCORE]):
@@ -188,13 +212,58 @@ def mock_noul_browse_more(text: str) -> float:
     ], 0.18, "|more")
 
 
+def _words(items) -> set[str]:
+    out = set()
+    for s in items or []:
+        out.update(w for w in re.findall(r"[a-z0-9+#.]+", str(s).lower()) if len(w) >= 2)
+    return out
+
+
+_GENERIC = {"engineer", "developer", "senior", "junior", "staff", "lead", "and", "the", "of"}
+
+
+def mock_noul_open(card: dict, profile: dict) -> float:
+    title = str(card.get("title") or "").lower()
+    roles = _words(profile.get("target_roles")) - _GENERIC
+    skills = _words(profile.get("skills"))
+    hits = sum(1 for w in roles | skills if re.search(rf"(?<![a-z0-9]){re.escape(w)}(?![a-z0-9])", title))
+    base = 0.90 if hits >= 2 else 0.72 if hits == 1 else 0.40 if _JOB.search(title) else 0.10
+    return _j(title + "|open", base, 0.04)
+
+
+def mock_fit(state: dict) -> dict[str, float]:
+    prof, job = state.get("candidate_profile") or {}, state.get("job") or {}
+    title = str(job.get("title") or "").lower()
+    b = f"{title} {job.get('location', '')} {job.get('text', '')}".lower()
+    roles = _words(prof.get("target_roles")) - _GENERIC
+    role = 0.90 if any(w in title for w in roles) else 0.35
+    skills = [str(s).lower() for s in prof.get("skills") or []]
+    frac = sum(1 for s in skills if s in b) / max(1, len(skills))
+    skill = 0.20 + 0.75 * min(1.0, frac * 2)
+    yrs = float(prof.get("years_experience") or 0)
+    need = [int(n) for n in re.findall(r"(\d{1,2})\+?\s*(?:years|yrs)", b)]
+    senior = bool(re.search(r"\b(senior|staff|principal|lead)\b", title))
+    sen = 0.85
+    if need and min(need) > yrs + 1:
+        sen = 0.25
+    elif senior and yrs < 5:
+        sen = 0.35
+    locs = _words(prof.get("locations"))
+    loc = 0.85 if (locs & _words([b])) else 0.45
+    fit = 0.35 * role + 0.35 * skill + 0.20 * sen + 0.10 * loc
+    raw = dict(role_match=role, skills_match=skill, seniority_match=sen, location_match=loc, overall_fit=fit)
+    return {k: _j(b + k, v, 0.02) for k, v in raw.items()}
+
+
 def _mock_answer(questions: dict, state) -> dict[str, Ans]:
     st = state if isinstance(state, dict) else {}
     links, url, title = st.get("links") or [], st.get("url") or "", st.get("title") or ""
     answers: dict[str, Ans] = {}
     if "page_kind" in questions:
         answers["page_kind"] = _choice(mock_page_kind(url, title, links), PAGE_KINDS, url + title)
-    if "overall_fit" in questions:
+    if "role_match" in questions:
+        answers.update({k: Ans(type="noul", noul=v) for k, v in mock_fit(st).items()})
+    elif "overall_fit" in questions:
         answers.update({k: Ans(type="noul", noul=v) for k, v in mock_detail(st).items()})
     for i, link in enumerate(links):
         t, h = link.get("text") or "", link.get("href") or ""
@@ -204,6 +273,8 @@ def _mock_answer(questions: dict, state) -> dict[str, Ans]:
     for job in st.get("jobs") or []:
         i, t = int(job.get("i", 0)), job.get("title") or job.get("text") or ""
         vals = {f"sw_{i}": mock_noul_software(t), f"ai_{i}": mock_noul_ai(t)}
+        if f"open_{i}" in questions:
+            vals[f"open_{i}"] = mock_noul_open(job, st.get("candidate_profile") or {})
         answers.update({qid: Ans(type="noul", noul=val) for qid, val in vals.items() if qid in questions})
     query = str(st.get("hunt_query") or "")
     for c in st.get("controls") or []:

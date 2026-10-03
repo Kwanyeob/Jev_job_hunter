@@ -87,3 +87,28 @@ DETAIL_NOULS = {
     "backend_fullstack_relevance": "Given `candidate_profile` and `job`, is this primarily backend or full-stack?",
     "overall_fit": "Given `candidate_profile` and `job`, should this candidate save this posting?",
 }
+
+# LinkedIn (logged out): cards → Jev triage → company ATS page → Jev fit vs resume profile.
+LINKEDIN_MAX_CARDS = 60
+LINKEDIN_MAX_OPEN = 10
+LINKEDIN_OPEN_THRESHOLD = 0.5
+LINKEDIN_CARD_BATCH = 40
+LINKEDIN_MIN_ATS_TEXT = 400
+
+
+def open_card_instructions(i: int, title: str, company: str) -> str:
+    title = (title or "").replace('"', "'")[:80]
+    company = (company or "").replace('"', "'")[:60]
+    return (
+        f'Given `candidate_profile` and `hunt_query`, is the job `jobs[{i}]` titled "{title}" '
+        f'at "{company}" worth opening to read the full description?'
+    )
+
+
+FIT_NOULS = {
+    "role_match": "Given `candidate_profile` and `job`, does this role match the candidate's target roles?",
+    "skills_match": "Given `candidate_profile` and `job`, does the candidate have most of the required skills and technologies?",
+    "seniority_match": "Given `candidate_profile` and `job`, does the required experience level match the candidate's years of experience and seniority?",
+    "location_match": "Given `candidate_profile` and `job`, is the job location or remote policy compatible with the candidate's locations?",
+    "overall_fit": "Given `candidate_profile` and `job`, should this candidate apply to this posting?",
+}

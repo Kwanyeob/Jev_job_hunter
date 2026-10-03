@@ -10,6 +10,8 @@ dependencies = [
     "pyyaml",
     "httpx",
     "websockets>=14",
+    "openpyxl>=3.1",
+    "anthropic>=1.9",
 ]
 
 [project.scripts]
@@ -24,6 +26,7 @@ packages = ["jev_job_hunter"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "jev_job_hunter/extract.js" = "jev_job_hunter/extract.js"
+"jev_job_hunter/web/index.html" = "jev_job_hunter/web/index.html"
 
 [dependency-groups]
 dev = ["pytest>=8"]

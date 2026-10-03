@@ -1,4 +1,4 @@
-"""jjh CLI: start / js / step / run / report / log."""
+"""jjh CLI: start / js / step / run / report / log / linkedin."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from jev_job_hunter.store import (
     append_log, expected_url, finish_report, load_env, load_run, new_run,
     note_action, read_log, save_run, truncate_log,
 )
-from jev_job_hunter.questions import MAX_LINKS_TO_SCORE
+from jev_job_hunter.questions import LINKEDIN_MAX_CARDS, LINKEDIN_MAX_OPEN, MAX_LINKS_TO_SCORE
 
 
 def _company_specs(ns) -> list[str]:
@@ -140,6 +140,19 @@ def cmd_run(root: Path, ns) -> None:
     run_hunt(root, ",".join(_company_specs(ns)), _mock(ns), ns.max_pages, ns.tab, ns.query)
 
 
+def cmd_linkedin(root: Path, ns) -> None:
+    from jev_job_hunter.linkedin import run_linkedin
+    run_linkedin(root, profile_path=ns.profile or None, queries=ns.query or None,
+                 location=ns.location, posted=ns.posted, remote=ns.remote,
+                 max_cards=ns.max_cards, max_open=ns.max_open, delay=ns.delay,
+                 mock=_mock(ns), tab=ns.tab)
+
+
+def cmd_web(root: Path, ns) -> None:
+    from jev_job_hunter.web import serve
+    serve(root, port=ns.port, open_browser=not ns.no_browser)
+
+
 def cmd_report(root: Path, ns) -> None:
     t0 = time.perf_counter()
     run = load_run(root)
@@ -193,6 +206,20 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--query", default="")
     sub.add_parser("report").add_argument("--mock", action="store_true")
     sub.add_parser("log")
+    li = sub.add_parser("linkedin", help="LinkedIn (logged out) → company ATS → Jev fit → Excel")
+    li.add_argument("--profile", default="", help="default config/profile.yaml")
+    li.add_argument("--query", action="append", default=[], help="repeatable; default profile search.queries")
+    li.add_argument("--location", default=None)
+    li.add_argument("--posted", choices=("day", "week", "month", "any"), default=None)
+    li.add_argument("--remote", choices=("any", "remote", "hybrid", "onsite"), default=None)
+    li.add_argument("--max-cards", type=int, default=LINKEDIN_MAX_CARDS, help="per query")
+    li.add_argument("--max-open", type=int, default=LINKEDIN_MAX_OPEN)
+    li.add_argument("--delay", type=float, default=2.0, help="seconds between page loads")
+    li.add_argument("--tab", choices=("new", "reuse"), default="new")
+    li.add_argument("--mock", action="store_true")
+    w = sub.add_parser("web", help="local site: drop a resume, watch jobs stream in, download Excel")
+    w.add_argument("--port", type=int, default=8765)
+    w.add_argument("--no-browser", action="store_true")
     return p
 
 
@@ -200,7 +227,7 @@ def main(argv=None) -> None:
     ns = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
     root = load_env()
     {"start": cmd_start, "js": cmd_js, "step": cmd_step, "run": cmd_run,
-     "report": cmd_report, "log": cmd_log}[ns.cmd](root, ns)
+     "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "web": cmd_web}[ns.cmd](root, ns)
 
 
 if __name__ == "__main__":

@@ -4,8 +4,9 @@ description: >-
   Finds AI and software-engineer jobs by driving Chrome DevTools MCP and letting
   Jev (TypeSafe System One) score every careers link and job title. Use when the
   user wants to find jobs, run the job hunter, browse careers pages, match AI
-  engineer roles, or mentions Jev / TypeSafe job search. Chrome sees and acts;
-  Jev decides — the host LLM never picks links.
+  engineer roles, or mentions Jev / TypeSafe job search. Also use when the user
+  gives a resume (PDF) and wants LinkedIn jobs ranked against it in Excel.
+  Chrome sees and acts; Jev decides — the host LLM never picks links.
 ---
 
 # Jev AI Job Hunter
@@ -19,6 +20,24 @@ Run every command from the repo root with `uv run jjh ...`.
 1. If `.env` has no `TYPESAFE_API_KEY`, tell the user and use `--mock` **only if they agree**. Copy `.env.example` otherwise.
 2. Use a **visible** Chrome window. `jjh run` talks to Chrome over CDP itself — do **not** call `list_pages` / `evaluate_script` / `navigate_page` in the primary path (a second debugger connection makes Chrome ask Allow again).
 3. Follow ATS redirects (Greenhouse / Lever / Ashby / Workday). Cross-domain is expected. Never log in, apply, or fill forms.
+
+## LinkedIn from a resume
+
+Use when the user hands you a resume and wants LinkedIn jobs ranked for it. Two steps; you write the profile, Jev does all the judging.
+
+1. **Resume → `config/profile.yaml`.** Read the PDF yourself (Read tool). Write `config/profile.yaml` with exactly the shape of `config/profile.example.yaml`:
+   - `candidate`: `headline`, `summary` (2–3 sentences), `years_experience` (number), `seniority`, `skills` (concrete technologies, ≤ 20), `target_roles` (3–5 LinkedIn-style titles), `interests`, `locations`, `languages`.
+   - `search`: `queries` (2–3 short titles from `target_roles`), `location`, `remote`, `posted`.
+   - **No name, email, phone, address, or profile links** — everything under `candidate` is sent to Jev. Only what the resume supports; do not embellish.
+   - Show the user the YAML and ask them to confirm or edit `target_roles`, `locations`, and `search` before running. The file is git-ignored.
+2. **Hunt.** `uv run jjh linkedin` (flags override `search`: `--query` repeatable, `--location`, `--posted day|week|month|any`, `--remote any|remote|hybrid|onsite`, `--max-cards`, `--max-open`). Stream the entire stdout and give the user the `Excel` path from the report.
+
+Flow: **LinkedIn public search (logged out) → Jev triages every card title → open the top cards via LinkedIn's guest posting endpoint (full description + seniority criteria; the company ATS only when an apply URL is exposed, which logged-out LinkedIn no longer does) → Jev fit vs the profile → `results/linkedin-*.xlsx`** (sheets Matches / All listings / Profile). `jjh` launches its own Chrome profile on port 9222 if no debuggable Chrome is found.
+
+If the user wants a UI instead: `uv run jjh web` (resume drop → Claude Fable 5.1 fills the profile when `ANTHROPIC_API_KEY` is set; live table; Excel download).
+
+- Never log in to LinkedIn, never click Easy Apply. One login wall skips a posting; if stdout says `LinkedIn login wall` at the end, two came in a row and the partial Excel is already written — tell the user; retry later or with a smaller `--max-open` / larger `--delay`.
+- You do not re-rank or second-guess Jev's scores in your summary; report them as-is.
 
 ## Loop
 

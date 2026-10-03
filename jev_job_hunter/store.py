@@ -32,13 +32,13 @@ def load_run(root: Path) -> dict:
     path = root / "state" / "run.json"
     if not path.exists():
         raise SystemExit("ERROR: no run in progress. Run `jjh start` first.")
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def save_run(root: Path, run: dict) -> None:
     path = root / "state" / "run.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(run, indent=2) + "\n")
+    path.write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
 
 
 def log_path(root: Path) -> Path:
@@ -48,7 +48,7 @@ def log_path(root: Path) -> Path:
 def truncate_log(root: Path) -> None:
     path = log_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("")
+    path.write_text("", encoding="utf-8")
 
 
 def append_log(root: Path, rec: dict) -> None:
@@ -143,7 +143,7 @@ def resolve_companies(catalog: list[dict], specs: list[str] | None) -> list[dict
 
 
 def new_run(root: Path, company_ids: list[str] | None, mock: bool, query: str = "") -> dict:
-    cfg = yaml.safe_load((root / "config" / "companies.yaml").read_text())
+    cfg = yaml.safe_load((root / "config" / "companies.yaml").read_text(encoding="utf-8"))
     companies = [{**c, "status": "pending"} for c in resolve_companies(cfg["companies"], company_ids)]
     if not companies:
         raise SystemExit("ERROR: no companies selected.")
@@ -238,7 +238,7 @@ def write_results(root: Path, run: dict, summary: dict, ranked: list[dict]) -> N
                "summary": summary, "matches": ranked,
                "run": {"companies": run["companies"], "pages_visited": run["pages_visited"],
                        "stats": run["stats"], "results": run["results"]}}
-    (out / "latest.json").write_text(json.dumps(payload, indent=2) + "\n")
+    (out / "latest.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     lines = ["# AI Job Hunter — results", "",
              *(f"- {k} **{summary[v]}**" for k, v in
                (("Scanned", "scanned"), ("Visited", "pages"), ("Jobs found", "jobs_found"),
@@ -246,4 +246,4 @@ def write_results(root: Path, run: dict, summary: dict, ranked: list[dict]) -> N
     for i, m in enumerate(ranked, 1):
         lines += [f"## {i}. {m['title']}", f"- {m['company']}",
                   f"- Match: {int(round(m['overall_fit'] * 100))}%", f"- {m['url']}", ""]
-    (out / "latest.md").write_text("\n".join(lines))
+    (out / "latest.md").write_text("\n".join(lines), encoding="utf-8")

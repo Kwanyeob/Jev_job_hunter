@@ -4,9 +4,14 @@
 !.env.example
 AGENTS.md
 
+# personal profile built from a resume
+config/profile.yaml
+*.pdf
+
 # not published — skill lives in skills/
 agents/
 .agents/
+.omc/
 .grok/
 demo/
 DEMO.md

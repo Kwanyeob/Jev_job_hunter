@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JevScout</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
+    --accent: #2f5bd3; --accent-ink: #ffffff; --good: #1f8a4c; --warn: #b7791f; --bad: #c0392b;
+    --chip: #eef1fb; --row-hi: #f1f8f3; --drop: #f2f4fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c9b95; --line: #33332f;
+      --accent: #7c9cf5; --accent-ink: #0f1115; --good: #5cc98a; --warn: #e0b35a; --bad: #ef7a6c;
+      --chip: #262b3a; --row-hi: #1d2a22; --drop: #1c2030;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); }
+  .pills { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.ok { color: var(--good); border-color: currentColor; }
+  .pill.off { color: var(--warn); border-color: currentColor; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  h2 .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+          display: inline-grid; place-items: center; font-size: 12px; }
+  #drop { border: 2px dashed var(--line); border-radius: 10px; padding: 28px 16px; text-align: center;
+          background: var(--drop); cursor: pointer; transition: border-color .15s; }
+  #drop.over { border-color: var(--accent); }
+  #drop strong { display: block; font-size: 15px; margin-bottom: 4px; }
+  #drop input { display: none; }
+  .msg { margin-top: 10px; min-height: 1.5em; color: var(--muted); }
+  .msg.err { color: var(--bad); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 16px; }
+  .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 64px; resize: vertical; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  #status { color: var(--muted); }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 10px 0 14px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .tools input { max-width: 260px; }
+  .count { color: var(--muted); font-size: 13px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); position: sticky; top: 0;
+       cursor: pointer; user-select: none; white-space: nowrap; }
+  tr.fit-hi td { background: var(--row-hi); }
+  tr.new td { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { background: var(--chip); } }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .title { font-weight: 600; }
+  .dim { color: var(--muted); }
+  a { color: var(--accent); }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--chip); }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>JevScout</h1>
+    <span class="sub">Resume in, ranked LinkedIn jobs out. Chrome reads, Jev decides.</span>
+    <div class="pills"><span class="pill" id="p-claude">Claude</span><span class="pill" id="p-jev">Jev</span></div>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Resume</h2>
+    <label id="drop" for="file">
+      <strong>Drop your resume PDF here</strong>
+      <span class="dim">or click to choose a file. Claude reads it once and fills in the profile below.</span>
+      <input type="file" id="file" accept="application/pdf,.pdf">
+    </label>
+    <div class="msg" id="resume-msg"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Profile and search</h2>
+    <div class="grid">
+      <div class="wide"><label for="headline">Headline</label><input type="text" id="headline"></div>
+      <div class="wide"><label for="summary">Summary</label><textarea id="summary"></textarea></div>
+      <div><label for="years">Years of experience</label><input type="number" id="years" min="0" step="0.5"></div>
+      <div><label for="seniority">Seniority</label>
+        <select id="seniority"><option>intern</option><option>entry</option><option selected>mid</option><option>senior</option><option>staff</option></select></div>
+      <div class="wide"><label for="skills">Skills</label><input type="text" id="skills"><div class="hint">Comma separated</div></div>
+      <div><label for="roles">Target roles</label><input type="text" id="roles"><div class="hint">Comma separated</div></div>
+      <div><label for="locations">Locations</label><input type="text" id="locations"></div>
+      <div><label for="interests">Interests</label><input type="text" id="interests"></div>
+      <div><label for="languages">Languages</label><input type="text" id="languages"></div>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="wide"><label for="queries">LinkedIn searches</label><input type="text" id="queries"><div class="hint">Comma separated, one search each</div></div>
+      <div><label for="location">Search location</label><input type="text" id="location" placeholder="City, Region, Country"></div>
+      <div><label for="posted">Posted within</label>
+        <select id="posted"><option value="day">24 hours</option><option value="week" selected>Week</option><option value="month">Month</option><option value="any">Any time</option></select></div>
+      <div><label for="remote">Workplace</label>
+        <select id="remote"><option value="any">Any</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">On-site</option></select></div>
+      <div><label for="max-cards">Cards per search</label><input type="number" id="max-cards" min="5" max="200"></div>
+      <div><label for="max-open">Postings Jev reads</label><input type="number" id="max-open" min="1" max="50"></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="start">Start hunt</button>
+      <button id="stop" disabled>Stop</button>
+      <label class="check"><input type="checkbox" id="mock"> Mock Jev (no API key, keyword scores)</label>
+    </div>
+    <div class="msg" id="hunt-msg"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Jobs</h2>
+    <div id="status">No hunt yet.</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="tools">
+      <input type="text" id="filter" placeholder="Filter by title, company, location">
+      <span class="count" id="count"></span>
+      <span style="flex:1"></span>
+      <button id="export" disabled>Download Excel</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-k="title">Job title</th><th data-k="company">Company</th><th data-k="location">Location</th>
+          <th data-k="posted">Updated</th><th data-k="open">Jev open</th><th data-k="fit">Fit</th>
+          <th data-k="level">Level</th><th data-k="apply_type">Apply via</th><th data-k="id">Job ID</th><th>Links</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="10" class="empty">Cards appear here as soon as LinkedIn shows them.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const cards = new Map();
+let sortKey = null, sortDir = -1, es = null, picked = 0, fitted = 0, lastXlsx = "";
+
+const list = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const join = (a) => (a || []).join(", ");
+const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + "%" : "");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+function fill(p) {
+  if (!p) return;
+  const c = p.candidate || {}, s = p.search || {};
+  $("headline").value = c.headline || ""; $("summary").value = c.summary || "";
+  $("years").value = c.years_experience ?? ""; $("seniority").value = c.seniority || "mid";
+  $("skills").value = join(c.skills); $("roles").value = join(c.target_roles);
+  $("locations").value = join(c.locations); $("interests").value = join(c.interests);
+  $("languages").value = join(c.languages);
+  $("queries").value = join(s.queries); $("location").value = s.location || "";
+  $("posted").value = s.posted || "week"; $("remote").value = s.remote || "any";
+  fill.education = c.education || "";
+}
+
+function read() {
+  const cand = {
+    headline: $("headline").value.trim(), summary: $("summary").value.trim(),
+    years_experience: parseFloat($("years").value) || 0, seniority: $("seniority").value,
+    skills: list($("skills").value), target_roles: list($("roles").value),
+    locations: list($("locations").value), interests: list($("interests").value),
+    languages: list($("languages").value),
+  };
+  if (fill.education) cand.education = fill.education;
+  return { candidate: cand, search: {
+    queries: list($("queries").value), location: $("location").value.trim(),
+    posted: $("posted").value, remote: $("remote").value } };
+}
+
+function msg(id, text, err) { const el = $(id); el.textContent = text || ""; el.classList.toggle("err", !!err); }
+
+async function upload(file) {
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { msg("resume-msg", "That is not a PDF.", true); return; }
+  msg("resume-msg", `Claude is reading ${file.name}. This can take up to a minute.`);
+  try {
+    const r = await fetch("/api/resume", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    fill(j.profile);
+    msg("resume-msg", `Profile filled from ${file.name}. Check it, then start the hunt. Contact details were not extracted.`);
+  } catch (e) { msg("resume-msg", e.message, true); }
+}
+
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files[0]); });
+$("file").addEventListener("change", (e) => upload(e.target.files[0]));
+
+function row(c) {
+  const hi = typeof c.fit === "number" && c.fit >= 0.7;
+  const links = [`<a href="${esc(c.href)}" target="_blank" rel="noopener">LinkedIn</a>`];
+  if (c.apply_url) links.push(`<a href="${esc(c.apply_url)}" target="_blank" rel="noopener">Company site</a>`);
+  const updated = c.posted_text || c.posted || "";
+  return `<tr class="${hi ? "fit-hi" : ""}${c._new ? " new" : ""}">
+    <td><div class="title">${esc(c.title)}</div><div class="dim">${esc(c.query)}</div></td>
+    <td>${esc(c.company)}</td><td>${esc(c.location)}</td>
+    <td class="num" title="${esc(c.posted)}">${esc(updated)}</td>
+    <td class="num">${pct(c.open)}${c.opened ? ' <span class="tag">read</span>' : ""}</td>
+    <td class="num"><strong>${pct(c.fit)}</strong></td>
+    <td class="dim">${esc(c.level)}</td>
+    <td>${c.apply_type ? `<span class="tag">${esc(c.apply_type)}</span>` : ""}</td>
+    <td class="num dim">${esc(c.id)}</td><td>${links.join(" · ")}</td></tr>`;
+}
+
+function render() {
+  const q = $("filter").value.trim().toLowerCase();
+  let rows = [...cards.values()];
+  if (q) rows = rows.filter((c) => `${c.title} ${c.company} ${c.location}`.toLowerCase().includes(q));
+  const key = sortKey || (fitted ? "fit" : picked ? "open" : null);
+  if (key) rows.sort((a, b) => {
+    const x = a[key] ?? (key === "fit" || key === "open" ? -1 : ""), y = b[key] ?? (key === "fit" || key === "open" ? -1 : "");
+    return (x > y ? 1 : x < y ? -1 : 0) * (sortKey ? sortDir : -1);
+  });
+  $("rows").innerHTML = rows.length ? rows.map(row).join("")
+    : `<tr><td colspan="10" class="empty">${cards.size ? "No jobs match the filter." : "Cards appear here as soon as LinkedIn shows them."}</td></tr>`;
+  for (const c of cards.values()) c._new = false;
+  $("count").textContent = cards.size ? `${rows.length} of ${cards.size} jobs · ${fitted} scored for fit` : "";
+  $("export").disabled = !cards.size;
+}
+
+document.querySelectorAll("th[data-k]").forEach((th) => th.addEventListener("click", () => {
+  const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : (k === "fit" || k === "open" ? -1 : 1); sortKey = k; render();
+}));
+$("filter").addEventListener("input", render);
+
+function setRunning(on) {
+  $("start").disabled = on; $("stop").disabled = !on;
+}
+
+function listen() {
+  if (es) es.close();
+  es = new EventSource("/api/events?since=0");
+  es.addEventListener("status", (e) => { $("status").textContent = JSON.parse(e.data).msg; });
+  es.addEventListener("search", (e) => { $("status").textContent = `Searching LinkedIn: ${JSON.parse(e.data).query}`; $("bar").style.width = "10%"; });
+  es.addEventListener("card", (e) => { const c = JSON.parse(e.data); c._new = true; cards.set(c.id, c); render(); });
+  es.addEventListener("triage", (e) => {
+    const d = JSON.parse(e.data);
+    for (const [id, v] of Object.entries(d.scores)) if (cards.has(id)) cards.get(id).open = v;
+    for (const id of d.picked) if (cards.has(id)) cards.get(id).opened = true;
+    picked = d.picked.length; $("bar").style.width = "30%"; render();
+  });
+  es.addEventListener("fit", (e) => {
+    const d = JSON.parse(e.data); if (cards.has(d.id)) Object.assign(cards.get(d.id), d, { _new: true });
+    fitted++; $("bar").style.width = `${30 + 70 * fitted / Math.max(1, picked)}%`; render();
+  });
+  es.addEventListener("error", (e) => { if (e.data) msg("hunt-msg", JSON.parse(e.data).msg, true); });
+  es.addEventListener("done", (e) => {
+    const d = JSON.parse(e.data); lastXlsx = d.xlsx || "";
+    $("bar").style.width = "100%"; setRunning(false);
+    $("status").textContent = d.stopped ? d.stopped : `Done: ${d.cards} jobs, ${d.matches} read and scored.`;
+    if (lastXlsx) msg("hunt-msg", `Saved ${lastXlsx}`);
+    es.close(); es = null;
+  });
+}
+
+$("start").addEventListener("click", async () => {
+  const profile = read();
+  if (!profile.candidate.target_roles.length) { msg("hunt-msg", "Add at least one target role.", true); return; }
+  cards.clear(); picked = 0; fitted = 0; sortKey = null; render(); $("bar").style.width = "3%";
+  msg("hunt-msg", "");
+  $("status").textContent = "Starting. A separate Chrome window opens for LinkedIn (logged out).";
+  setRunning(true);
+  try {
+    const r = await fetch("/api/hunt", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, mock: $("mock").checked,
+        max_cards: +$("max-cards").value, max_open: +$("max-open").value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    if (j.mock) msg("hunt-msg", "Mock Jev: scores come from keyword rules, not the Jev API.");
+    listen();
+  } catch (e) { setRunning(false); msg("hunt-msg", e.message, true); }
+});
+
+$("stop").addEventListener("click", async () => { $("stop").disabled = true; await fetch("/api/stop", { method: "POST" }); });
+$("export").addEventListener("click", () => { window.location = "/api/export.xlsx"; });
+
+(async () => {
+  const s = await (await fetch("/api/state")).json();
+  const pill = (id, on, yes, no) => { const el = $(id); el.textContent = on ? yes : no; el.className = "pill " + (on ? "ok" : "off"); };
+  pill("p-claude", s.claude, "Claude key set", "No Claude key");
+  pill("p-jev", s.jev, "Jev key set", "No Jev key (mock)");
+  $("mock").checked = !s.jev; $("mock").disabled = !s.jev;
+  $("max-cards").value = s.defaults.max_cards; $("max-open").value = s.defaults.max_open;
+  if (s.profile) { fill(s.profile); msg("resume-msg", "Loaded your saved profile. Drop a new resume to replace it."); }
+  if (!s.claude) msg("resume-msg", (s.profile ? "Loaded your saved profile. " : "") + "No Claude key: resume reading is off, but you can type the profile in by hand.");
+  if (s.running) { setRunning(true); listen(); return; }  // replay rebuilds the table
+  for (const c of s.cards || []) cards.set(c.id, c);
+  fitted = (s.cards || []).filter((c) => "fit" in c).length;
+  picked = (s.cards || []).filter((c) => c.opened).length;
+  render();
+})();
+</script>
+</body>
+</html>

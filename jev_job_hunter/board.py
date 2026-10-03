@@ -97,3 +97,66 @@ def print_report(summary: dict, ranked: list[dict]) -> None:
     for i, m in enumerate(ranked, 1):
         print(f"  {i}. {m['title']}\n     {m['company']}\n     Match: {int(round(m['overall_fit']*100))}%\n     {m['url']}")
     print(BAR)
+
+
+FIT_LABELS = (
+    ("role_match", "Role match"),
+    ("skills_match", "Skills match"),
+    ("seniority_match", "Seniority match"),
+    ("location_match", "Location match"),
+    ("overall_fit", "Overall fit"),
+)
+
+
+def _pct(v) -> str:
+    return f"{int(round(float(v or 0) * 100)):3d}%"
+
+
+def print_li_start(profile: dict, queries: list[str], location: str, posted: str, remote: str) -> None:
+    print(BAR, "\n  LINKEDIN JOB HUNTER\n", BAR, sep="")
+    print(f"  {profile.get('headline', '')}")
+    print(f"  Skills     {', '.join(map(str, profile.get('skills') or []))[:120]}")
+    print(f"  Target     {', '.join(profile.get('target_roles') or [])}")
+    print("-" * 52)
+    print(f"  Queries    {' | '.join(queries)}")
+    print(f"  Location   {location or '(any)'}  ·  posted {posted}  ·  {remote}")
+    print(BAR)
+
+
+def print_li_search(query: str, url: str) -> None:
+    print(f"  STAGE search  {query!r}\n  {url}", flush=True)
+
+
+def print_li_triage(cards: list[dict], picked: list[dict], jev_ms: int) -> None:
+    print(BAR)
+    print(f"  STAGE triage  ·  {len(cards)} cards  →  open {len(picked)}")
+    print("-" * 52)
+    chosen = {id(c) for c in picked}
+    for c in sorted(cards, key=lambda c: c.get("open") or 0, reverse=True)[:20]:
+        flag = "OPEN" if id(c) in chosen else "skip"
+        label = f"{c.get('title', '')} · {c.get('company', '')}"
+        print(f"  {label[:52]:<52}  {_pct(c.get('open'))}  {flag}")
+    print(f"  Jev     {jev_ms} ms")
+
+
+def print_li_fit(n: int, total: int, card: dict, post: dict, scores: dict, save: bool, jev_ms: int) -> None:
+    print(BAR)
+    print(f"  [{n}/{total}]  {card.get('company', '')}  ·  {card.get('title', '')}")
+    print(f"  source {post['source']}  {post['url']}\n  STAGE fit\n{'-'*52}")
+    for key, label in FIT_LABELS:
+        print(f"  {label:<24} {_pct(scores.get(key))}")
+    print(f"  → {'Save' if save else 'Skip'}   Jev {jev_ms} ms", flush=True)
+
+
+def print_li_report(matches: list[dict], n_cards: int, path, elapsed: float) -> None:
+    from jev_job_hunter.questions import FIT_SAVE_THRESHOLD
+    strong = sum(1 for m in matches if (m.get("fit") or 0) >= FIT_SAVE_THRESHOLD)
+    print(BAR, "\n  LINKEDIN JOB HUNTER  ·  REPORT\n", BAR, sep="")
+    print(f"  Cards {n_cards} / Opened {len(matches)} / Strong matches {strong}  ({elapsed:.1f} s)")
+    print("-" * 52)
+    for i, m in enumerate(matches[:10], 1):
+        print(f"  {i}. {m.get('title', '')}  ·  {m.get('company', '')}\n     Fit {_pct(m.get('fit'))}  [{m.get('source')}]  {m.get('apply_url') or m.get('href')}")
+    if not matches:
+        print("  (no evaluated jobs)")
+    print(f"  Excel  {path}")
+    print(BAR)
