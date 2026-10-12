@@ -1,0 +1,44 @@
+Search: {'keywords': 'AI Engineer', 'location': 'South Korea', 'f_TPR': 'r604800'}  (guest fetched 2026-10-12T16:19:59, stopped: reached --max)
+
+guest 50 · login 26 (promoted 0) · both 22
+login results also in guest: 22/26 = 85%
+  excluding promoted:        22/26 = 85%
+guest results also in login: 22/50 = 44%
+top-10 overlap: 2/10
+top-25 overlap: 15/25
+
+only logged in (4):
+  4460196723  How promoted jobs are ranked
+  4468705795  Backend Engineer, AI Agents at an AI Company That Just Raised $550M · Harper
+  4450041924  ML Engineer (CSS) · Toss
+  4465498451  Founding Engineer, AI Agent: Build the Agent That Matches Engineers with $5B AI Companies · Harper
+
+only logged out (28):
+  4449381942  AI Engineer · Toss
+  4450481657  Software Engineer, AI Agent · delight.ai
+  4457999958  Senior Perception Engineer, Obstacle Foundation Models - Autonomous Vehicles · NVIDIA
+  4472884178  Software Engineer, AI Agents at an AI Agent Unicorn Fresh Off a $950M Round · Harper
+  4476810883  Robot Learning Engineer · SpaceVision AI, Inc.
+  4468603930  [AI Frontier Div.] AI Native Full Stack Engineer (5년 이상) · KRAFTON Inc.
+  4458763283  Senior AI/ML Engineer · GE HealthCare
+  4468715344  Software Engineer, AI Agents at an Insight Partners-backed AI Company · Harper
+  4423321960  AI Engineer - FDE (Forward Deployed Engineer) · Databricks
+  4475408214  ML Lead (Coupang Eats Search) · Coupang
+  4474999660  Solutions Architect - BytePlus - South Korea · ByteDance
+  4462934523  Senior Software Engineer · ProtoPie
+  4465277159  [Manufacturing Robotics] Humanoid Robot Operations Solution Development · Hyundai Motor Company
+  4431428608  Forward Deployed Engineer - Seoul · OpenAI
+  4465577117  [Ludo Robotics] Robotics Engineer (3~5 years) · Ludo Robotics
+  4477509534  Robotics Engineering Lead · Luxolis
+  4410609158  Forward Deployed Engineer · Databricks
+  4478398248  Vector Database and Vector Indexing Algorithm Development · XCENA
+  4476874476  Robotics Control Engineer · WIM Robotics
+  4440651362  [AI Research Div.] '26, '27년 전문연구요원 신규편입 (경력무관) · KRAFTON Inc.
+  4476138458  Senior AI Solutions Architect (Forward Deployed Engineer) · Concentrix
+  4475719691  Lead Navigation & Motion Planning Engineer · LionsBot International
+  4476154610  Robotics Engineer · MEDISBY
+  4475480091  Metep AI Compute Kernel Engineer | CPU/GPU Kernel Optimization · DesignedAI
+  4467714301  Principal Data Scientist · Philip Morris International
+  4420994174  Mid-Senior Quantum Developer - W/M · Pasqal
+  4478387615  KV 캐시 인프라 소프트웨어 엔지니어 (Software Engineer, KV Cache Infrastructure) · XCENA
+  4465262325  [SDF] Manufacturing DX MLOps Architect · Hyundai Motor Company

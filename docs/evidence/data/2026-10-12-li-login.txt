@@ -1,0 +1,26 @@
+4460196723		How promoted jobs are ranked	
+4466651205		How promoted jobs are ranked	
+4468705795		Backend Engineer, AI Agents at an AI Company That Just Raised $550M	Harper
+4476179818		Senior Software Engineer, Backend Performance Engineer (Verified job)	Roku
+4476254979		Software Enabling and Optimization Engineer	Intel
+4450041924		ML Engineer (CSS)	Toss
+4467858307		ML Engineer (Catalog)	Toss
+4466644352		Software Engineer, AI Model Enablement & Inference	FuriosaAI
+4458749373		Staff AI/ML Engineer	GE HealthCare
+4475212240		AI/ML Engineer	UX Factory, Inc.
+4466561958		Senior Machine Learning Engineer, Pegasus	TwelveLabs
+4053644706		Machine Learning Engineer-Technical Research Personnel (머신러닝 엔지니어-전문연구요원)	Moloco
+4421775615		Principal (Forward Deployed AI Engineer), South Korea - BCG X	BCG X
+4477117028		(Senior) Forward Deployed AI Engineer, South Korea - BCG X	Boston Consulting Group (BCG)
+4477524306		Advanced Analytics Engineer	Edwards Vacuum
+4475149997		Software Engineer (Backed-by Silicon Valley VC)	HOMI AI
+3833983742		Machine Learning Engineer (전문연구요원, alternative military service), R&D	CLO Virtual Fashion
+4465498451		Founding Engineer, AI Agent: Build the Agent That Matches Engineers with $5B AI Companies	Harper
+4478581126		Data Scientist (Personalization)	MUSINSA 무신사
+4477285949		캐릭터 AI 챗 (크러쉬팝) 서버 개발자	더크리스피 - The Crispy Inc.
+4466505050		Staff AI Engineer (Security)	Coupang
+4440764051		로보틱스 S/W 엔지니어링(자율주행 ML/팀장급)	(주)우아한형제들 (Woowa Bros.)
+4447683819		Forward Deployed AI Engineer, Japan / Korea (Senior/Principal Level)	Cloudera
+4459690346		AI Solutions Engineer	Bucketplace (Ohouse)
+4467790564		VIE R&D Engineer – AI & Automotive Engineering Tools H/F	Valeo
+4466583135		Staff ML Research Engineer, Multimodal Structure & Marengo	TwelveLabs
