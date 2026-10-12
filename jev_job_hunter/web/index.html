@@ -79,7 +79,7 @@
 <main>
   <header>
     <h1>JevScout</h1>
-    <span class="sub">Resume in, ranked LinkedIn jobs out. Chrome reads, Jev decides.</span>
+    <span class="sub">Resume in, ranked LinkedIn jobs out. Jev decides.</span>
     <div class="pills"><span class="pill" id="p-claude">Claude</span><span class="pill" id="p-jev">Jev</span></div>
   </header>
 
@@ -278,7 +278,7 @@ $("start").addEventListener("click", async () => {
   if (!profile.candidate.target_roles.length) { msg("hunt-msg", "Add at least one target role.", true); return; }
   cards.clear(); picked = 0; fitted = 0; sortKey = null; render(); $("bar").style.width = "3%";
   msg("hunt-msg", "");
-  $("status").textContent = "Starting. A separate Chrome window opens for LinkedIn (logged out).";
+  $("status").textContent = "Starting. Reading LinkedIn (logged out), 10 jobs per request with irregular pauses.";
   setRunning(true);
   try {
     const r = await fetch("/api/hunt", { method: "POST", headers: { "Content-Type": "application/json" },

@@ -13,7 +13,7 @@ from jev_job_hunter.store import (
     append_log, expected_url, finish_report, load_env, load_run, new_run,
     note_action, read_log, save_run, truncate_log,
 )
-from jev_job_hunter.questions import LINKEDIN_MAX_CARDS, LINKEDIN_MAX_OPEN, MAX_LINKS_TO_SCORE
+from jev_job_hunter.questions import LINKEDIN_DELAY, LINKEDIN_MAX_CARDS, LINKEDIN_MAX_OPEN, MAX_LINKS_TO_SCORE
 
 
 def _company_specs(ns) -> list[str]:
@@ -145,7 +145,7 @@ def cmd_linkedin(root: Path, ns) -> None:
     run_linkedin(root, profile_path=ns.profile or None, queries=ns.query or None,
                  location=ns.location, posted=ns.posted, remote=ns.remote,
                  max_cards=ns.max_cards, max_open=ns.max_open, delay=ns.delay,
-                 mock=_mock(ns), tab=ns.tab)
+                 mock=_mock(ns))
 
 
 def cmd_web(root: Path, ns) -> None:
@@ -214,8 +214,8 @@ def build_parser() -> argparse.ArgumentParser:
     li.add_argument("--remote", choices=("any", "remote", "hybrid", "onsite"), default=None)
     li.add_argument("--max-cards", type=int, default=LINKEDIN_MAX_CARDS, help="per query")
     li.add_argument("--max-open", type=int, default=LINKEDIN_MAX_OPEN)
-    li.add_argument("--delay", type=float, default=2.0, help="seconds between page loads")
-    li.add_argument("--tab", choices=("new", "reuse"), default="new")
+    li.add_argument("--delay", type=float, default=LINKEDIN_DELAY,
+                    help="mean seconds between LinkedIn requests (jittered)")
     li.add_argument("--mock", action="store_true")
     w = sub.add_parser("web", help="local site: drop a resume, watch jobs stream in, download Excel")
     w.add_argument("--port", type=int, default=8765)

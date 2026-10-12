@@ -32,11 +32,11 @@ Use when the user hands you a resume and wants LinkedIn jobs ranked for it. Two 
    - Show the user the YAML and ask them to confirm or edit `target_roles`, `locations`, and `search` before running. The file is git-ignored.
 2. **Hunt.** `uv run jjh linkedin` (flags override `search`: `--query` repeatable, `--location`, `--posted day|week|month|any`, `--remote any|remote|hybrid|onsite`, `--max-cards`, `--max-open`). Stream the entire stdout and give the user the `Excel` path from the report.
 
-Flow: **LinkedIn public search (logged out) → Jev triages every card title → open the top cards via LinkedIn's guest posting endpoint (full description + seniority criteria; the company ATS only when an apply URL is exposed, which logged-out LinkedIn no longer does) → Jev fit vs the profile → `results/linkedin-*.xlsx`** (sheets Matches / All listings / Profile). `jjh` launches its own Chrome profile on port 9222 if no debuggable Chrome is found.
+Flow: **LinkedIn public search (logged out) → Jev triages every card title → open the top cards via LinkedIn's guest posting endpoint (full description + seniority criteria; the company ATS only when an apply URL is exposed, which logged-out LinkedIn no longer does) → Jev fit vs the profile → `results/linkedin-*.xlsx`** (sheets Matches / All listings / Profile). LinkedIn is read over plain HTTP — no Chrome needed — 10 cards per request with irregular pauses (`--delay`, default 12 s mean); expect a few minutes per hunt.
 
 If the user wants a UI instead: `uv run jjh web` (resume drop → Claude Fable 5.1 fills the profile when `ANTHROPIC_API_KEY` is set; live table; Excel download).
 
-- Never log in to LinkedIn, never click Easy Apply. One login wall skips a posting; if stdout says `LinkedIn login wall` at the end, two came in a row and the partial Excel is already written — tell the user; retry later or with a smaller `--max-open` / larger `--delay`.
+- Never log in to LinkedIn, never click Easy Apply. One login wall skips a posting; if stdout says `LinkedIn login wall` or `LinkedIn rate limit` at the end, the partial Excel is already written — tell the user; retry later or with a smaller `--max-open` / larger `--delay`.
 - You do not re-rank or second-guess Jev's scores in your summary; report them as-is.
 
 ## Loop

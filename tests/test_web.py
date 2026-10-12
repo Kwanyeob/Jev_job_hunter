@@ -1,4 +1,4 @@
-"""Resume extraction (fake Claude client) and the local web server end to end (fake Chrome)."""
+"""Resume extraction (fake Claude client) and the local web server end to end (fake LinkedIn)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 from jev_job_hunter import resume, web
 from jev_job_hunter.linkedin import run_linkedin
 
-from test_linkedin import FakeSession
+from test_linkedin import fake_client
 
 PROFILE = {
     "candidate": {"headline": "Backend Engineer, 4 years Java", "summary": "Builds APIs.",
@@ -71,7 +71,7 @@ def server(tmp_path, monkeypatch):
     monkeypatch.setattr(resume, "extract_profile", lambda pdf, client=None: json.loads(json.dumps(PROFILE)))
 
     def runner(root, **kw):
-        return run_linkedin(root, delay=0, session=FakeSession(), out_dir=root / "results", **kw)
+        return run_linkedin(root, delay=0, client=fake_client(), out_dir=root / "results", **kw)
 
     hunt = web.Hunt()
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), web.make_handler(tmp_path, hunt, runner=runner))

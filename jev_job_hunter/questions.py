@@ -89,7 +89,8 @@ DETAIL_NOULS = {
 }
 
 # LinkedIn (logged out): cards → Jev triage → company ATS page → Jev fit vs resume profile.
-LINKEDIN_MAX_CARDS = 60
+LINKEDIN_MAX_CARDS = 30   # per query = 3 guest requests of 10; more trips LinkedIn's 429 sooner
+LINKEDIN_DELAY = 12.0     # mean seconds between LinkedIn requests (jittered, sometimes longer)
 LINKEDIN_MAX_OPEN = 10
 LINKEDIN_OPEN_THRESHOLD = 0.5
 LINKEDIN_CARD_BATCH = 40

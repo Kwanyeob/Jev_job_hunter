@@ -40,7 +40,7 @@ uv run jjh linkedin                       # queries / location from profile.yaml
 uv run jjh linkedin --query "AI Engineer" --location "Seoul" --posted week --max-open 10
 ```
 
-LinkedIn public search (logged out, in a separate Chrome profile the tool launches) → Jev triages card titles → the full posting from LinkedIn's guest endpoint (description + seniority / employment criteria; a company ATS page when LinkedIn exposes the apply URL, which it no longer does logged out) → Jev fit vs your profile → `results/linkedin-<time>.xlsx`. A login wall skips one posting and cools down; two in a row stop the hunt and still write what was scored.
+LinkedIn public search over plain HTTP (logged out, no Chrome; 10 cards per request with irregular ~12 s pauses, `--delay` to change; 60 s → 120 s back-off on 429) → Jev triages card titles → the full posting from LinkedIn's guest endpoint (description + seniority / employment criteria; a company ATS page when LinkedIn exposes the apply URL, which it no longer does logged out) → Jev fit vs your profile → `results/linkedin-<time>.xlsx`. A login wall skips one posting and cools down; two in a row, or a 429 that outlasts the back-off, stop the hunt and still write what was scored. Evidence that logged out sees the same jobs: [`docs/evidence/`](docs/evidence/2026-10-12-linkedin-guest-vs-login.md).
 
 ## Slow-motion (fixtures / narrated demos)
 
