@@ -1,7 +1,9 @@
 # LinkedIn 주기 수집 (`jjh watch`) 계획
 
+> **상태: 구현 완료 (2026-10-14).** 계획과 다른 점: 페이지를 그만 넘기는 조건이 "이전 회차에서 본 ID"가 아니라 "이번 회차 포함 이미 본 ID"입니다. 같은 회차에서 검색어끼리 결과가 겹치면 두 번째 검색어는 1페이지에서 멈춥니다. `collect_cards(stop_at_seen=True)`가 이 조건을 맡습니다.
+
 ## Context
-LinkedIn 수집을 HTTP로 바꿨습니다(아직 커밋하지 않음). 하지만 한 번 실행하면 끝나는 구조라서, 30~60분마다 새 공고만 가져오려면 다음 기능이 필요합니다.
+LinkedIn 수집을 HTTP로 바꿨습니다(`e601f24`). 하지만 한 번 실행하면 끝나는 구조라서, 30~60분마다 새 공고만 가져오려면 다음 기능이 필요합니다.
 - 이전에 본 job ID 기억
 - 새 공고만 Jev로 평가
 - 결과를 한 Excel 파일에 누적
@@ -51,7 +53,7 @@ uv run jjh watch --once                 # 1회만 (나중에 launchd/cron에 연
 ## 코드 변경
 - **`jev_job_hunter/linkedin.py`**
   - `run_linkedin`의 "평가 → 상세 읽기 → 적합도" 부분을 `score_cards(...)`로 분리하고, `run_linkedin`과 watch가 함께 씁니다. 동작은 바꾸지 않습니다.
-  - `collect_cards`에 `skip_seen_page` 옵션을 추가합니다. 받은 페이지에 이미 본 ID가 하나라도 있으면 다음 페이지를 받지 않고, 최대 페이지 수는 지킵니다.
+  - `collect_cards`에 `stop_at_seen` 옵션을 추가합니다. 받은 페이지에 이미 본 ID가 하나라도 있으면 다음 페이지를 받지 않고, 최대 페이지 수는 지킵니다.
 - **`jev_job_hunter/watch.py` (새 파일)**
   - `WatchState` 저장/불러오기
   - `run_cycle(...)` → 회차 요약 반환

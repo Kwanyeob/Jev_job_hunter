@@ -176,6 +176,7 @@ class GuestClient:
         self.delay, self.stop = delay, stop
         self.http = http or httpx.Client(headers=HEADERS, follow_redirects=True, timeout=20.0)
         self._last: float | None = None
+        self.requests = 0  # LinkedIn requests sent, retries included
 
     def close(self) -> None:
         self.http.close()
@@ -200,6 +201,7 @@ class GuestClient:
         """LinkedIn page body. Raises AuthWall / RateLimited; '' for other HTTP errors."""
         for attempt in range(RATE_LIMIT_RETRIES + 1):
             self._pace()
+            self.requests += 1
             try:
                 r = self.http.get(url)
             except httpx.HTTPError as e:
@@ -229,8 +231,10 @@ class GuestClient:
 
 
 def collect_cards(client: GuestClient, query: str, location: str, posted: str, remote: str,
-                  limit: int, seen: set[str] | None = None, emit=_noop, stop=None) -> list[dict]:
-    """Cards for one search, 10 per request, deduped against `seen`. Each new card is emitted as read."""
+                  limit: int, seen: set[str] | None = None, emit=_noop, stop=None,
+                  stop_at_seen: bool = False) -> list[dict]:
+    """Cards for one search, 10 per request, deduped against `seen`. Each new card is emitted as read.
+    With `stop_at_seen`, paging stops at the first page holding a job already in `seen`."""
     seen = set() if seen is None else seen
     params = search_params(query, location, posted, remote)
     url = search_url(query, location, posted, remote)
@@ -247,6 +251,7 @@ def collect_cards(client: GuestClient, query: str, location: str, posted: str, r
                 raise
             break  # keep what earlier pages gave
         pages += 1
+        reached_seen = any(c["id"] in seen for c in cards)
         for c in cards[:limit - total]:
             if c["id"] not in seen:
                 seen.add(c["id"])
@@ -254,7 +259,7 @@ def collect_cards(client: GuestClient, query: str, location: str, posted: str, r
                 new.append(card)
                 emit("card", card)
         total += len(cards)
-        if len(cards) < PAGE_SIZE:
+        if len(cards) < PAGE_SIZE or (stop_at_seen and reached_seen):
             break
     print(f"  collected {min(total, limit)} cards, {len(new)} new ({pages} requests)", flush=True)
     return new
@@ -329,6 +334,71 @@ def save_results(out_dir: Path, matches: list[dict], listings: list[dict], meta:
     return path
 
 
+def search_queries(client: GuestClient, queries: list[str], location: str, posted: str, remote: str,
+                   max_cards: int, seen: set[str], emit=_noop, stop=None,
+                   stop_at_seen: bool = False) -> list[dict]:
+    """New cards across all queries. A block mid-way keeps what earlier queries found;
+    it only raises when nothing was found at all."""
+    found: list[dict] = []
+    for q in queries:
+        _check(stop)
+        emit("status", {"msg": f"Searching LinkedIn: {q}"})
+        try:
+            found += collect_cards(client, q, location, posted, remote, max_cards,
+                                   seen=seen, emit=emit, stop=stop, stop_at_seen=stop_at_seen)
+        except (AuthWall, RateLimited) as e:
+            if not found:
+                raise
+            print(f"  LinkedIn blocked the search for {q!r} ({e}) — going on with {len(found)} cards", flush=True)
+            break
+    return found
+
+
+def score_cards(root: Path, cand: dict, hunt_query: str, cards: list[dict], client: GuestClient,
+                matches: list[dict], *, max_open: int, mock: bool, emit=_noop, stop=None) -> None:
+    """Jev triage of every card, then read + Jev fit the top `max_open`. Appends to `matches` as it
+    goes, so a login wall / rate limit / stop raised from here leaves the finished ones in place."""
+    emit("status", {"msg": f"Jev is triaging {len(cards)} titles"})
+    jev_ms = triage(cand, hunt_query, cards, mock)
+    picked = sorted((c for c in cards if c["open"] >= LINKEDIN_OPEN_THRESHOLD),
+                    key=lambda c: c["open"], reverse=True)[:max_open]
+    for c in picked:
+        c["opened"] = True
+    emit("triage", {"scores": {c["id"]: c["open"] for c in cards},
+                    "picked": [c["id"] for c in picked], "jev_ms": jev_ms})
+    board.print_li_triage(cards, picked, jev_ms)
+    append_log(root, {"cmd": "linkedin", "stage": "triage", "links": len(cards),
+                      "jev_ms": jev_ms, "action": f"OPEN {len(picked)}"})
+    walls = 0
+    for n, c in enumerate(picked, 1):
+        _check(stop)
+        emit("status", {"msg": f"Reading {n}/{len(picked)}: {c['title']} · {c.get('company', '')}"})
+        p0 = time.perf_counter()
+        try:
+            post = read_posting(client, c)
+        except AuthWall as e:
+            walls += 1
+            if walls >= AUTHWALL_LIMIT:
+                raise
+            print(f"  login wall reading {c['id']} ({str(e)[:80]}) — skipping, cooling down", flush=True)
+            emit("status", {"msg": "LinkedIn showed a login wall; skipping one posting and slowing down"})
+            client.sleep(client.delay * 8)
+            continue
+        walls = 0
+        scores, ms = score_fit(cand, c, post, mock)
+        fit = scores.get("overall_fit", 0.0)
+        m = {**c, **scores, "fit": fit, "source": post["source"], "apply_url": post["apply_url"],
+             "read_url": post["url"], "apply_type": post.get("apply_type", ""),
+             "level": post.get("level", ""), "employment": post.get("employment", "")}
+        matches.append(m)
+        emit("fit", {"id": c["id"], **{k: m[k] for k in (*scores, "fit", "source", "apply_url", "read_url",
+                                                         "apply_type", "level", "employment")}})
+        board.print_li_fit(n, len(picked), c, post, scores, fit >= FIT_SAVE_THRESHOLD, ms)
+        append_log(root, {"cmd": "linkedin", "stage": "fit", "url": post["url"], "jev_ms": ms,
+                          "total_ms": int((time.perf_counter() - p0) * 1000),
+                          "action": "SAVE" if fit >= FIT_SAVE_THRESHOLD else "SKIP"})
+
+
 def run_linkedin(root: Path, *, profile: dict | None = None, profile_path: str | None = None,
                  queries: list[str] | None = None, location: str | None = None,
                  posted: str | None = None, remote: str | None = None,
@@ -359,61 +429,13 @@ def run_linkedin(root: Path, *, profile: dict | None = None, profile_path: str |
     matches: list[dict] = []
     stopped = ""
     try:
-        seen: set[str] = set()
-        for q in queries:
-            _check(stop)
-            emit("status", {"msg": f"Searching LinkedIn: {q}"})
-            try:
-                listings += collect_cards(client, q, location, posted, remote, max_cards,
-                                          seen=seen, emit=emit, stop=stop)
-            except (AuthWall, RateLimited) as e:
-                if not listings:
-                    raise
-                print(f"  LinkedIn blocked the search for {q!r} ({e}) — going on with {len(listings)} cards",
-                      flush=True)
-                break
+        listings = search_queries(client, queries, location, posted, remote, max_cards,
+                                  seen=set(), emit=emit, stop=stop)
         if not listings:
             stopped = "no LinkedIn cards found"
         else:
-            emit("status", {"msg": f"Jev is triaging {len(listings)} titles"})
-            jev_ms = triage(cand, hunt_query, listings, mock)
-            picked = sorted((c for c in listings if c["open"] >= LINKEDIN_OPEN_THRESHOLD),
-                            key=lambda c: c["open"], reverse=True)[:max_open]
-            for c in picked:
-                c["opened"] = True
-            emit("triage", {"scores": {c["id"]: c["open"] for c in listings},
-                            "picked": [c["id"] for c in picked], "jev_ms": jev_ms})
-            board.print_li_triage(listings, picked, jev_ms)
-            append_log(root, {"cmd": "linkedin", "stage": "triage", "links": len(listings),
-                              "jev_ms": jev_ms, "action": f"OPEN {len(picked)}"})
-            walls = 0
-            for n, c in enumerate(picked, 1):
-                _check(stop)
-                emit("status", {"msg": f"Reading {n}/{len(picked)}: {c['title']} · {c.get('company', '')}"})
-                p0 = time.perf_counter()
-                try:
-                    post = read_posting(client, c)
-                except AuthWall as e:
-                    walls += 1
-                    if walls >= AUTHWALL_LIMIT:
-                        raise
-                    print(f"  login wall reading {c['id']} ({str(e)[:80]}) — skipping, cooling down", flush=True)
-                    emit("status", {"msg": "LinkedIn showed a login wall; skipping one posting and slowing down"})
-                    client.sleep(client.delay * 8)
-                    continue
-                walls = 0
-                scores, ms = score_fit(cand, c, post, mock)
-                fit = scores.get("overall_fit", 0.0)
-                m = {**c, **scores, "fit": fit, "source": post["source"], "apply_url": post["apply_url"],
-                     "read_url": post["url"], "apply_type": post.get("apply_type", ""),
-                     "level": post.get("level", ""), "employment": post.get("employment", "")}
-                matches.append(m)
-                emit("fit", {"id": c["id"], **{k: m[k] for k in (*scores, "fit", "source", "apply_url", "read_url",
-                                                                 "apply_type", "level", "employment")}})
-                board.print_li_fit(n, len(picked), c, post, scores, fit >= FIT_SAVE_THRESHOLD, ms)
-                append_log(root, {"cmd": "linkedin", "stage": "fit", "url": post["url"], "jev_ms": ms,
-                                  "total_ms": int((time.perf_counter() - p0) * 1000),
-                                  "action": "SAVE" if fit >= FIT_SAVE_THRESHOLD else "SKIP"})
+            score_cards(root, cand, hunt_query, listings, client, matches,
+                        max_open=max_open, mock=mock, emit=emit, stop=stop)
     except AuthWall as e:
         stopped = f"LinkedIn login wall ({e}) — stopped, results so far are saved"
     except RateLimited as e:

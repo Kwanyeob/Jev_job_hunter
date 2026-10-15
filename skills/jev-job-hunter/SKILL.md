@@ -34,6 +34,8 @@ Use when the user hands you a resume and wants LinkedIn jobs ranked for it. Two 
 
 Flow: **LinkedIn public search (logged out) → Jev triages every card title → open the top cards via LinkedIn's guest posting endpoint (full description + seniority criteria; the company ATS only when an apply URL is exposed, which logged-out LinkedIn no longer does) → Jev fit vs the profile → `results/linkedin-*.xlsx`** (sheets Matches / All listings / Profile). LinkedIn is read over plain HTTP — no Chrome needed — 10 cards per request with irregular pauses (`--delay`, default 12 s mean); expect a few minutes per hunt.
 
+If the user wants new postings over time: `uv run jjh watch` (same flags; polls every 30–60 min at random, quiet 01–07, scores only jobs never seen before, one cumulative `results/linkedin-watch.xlsx`). It runs until Ctrl+C, so start it in the background or hand the command to the user. `--once` runs a single cycle.
+
 If the user wants a UI instead: `uv run jjh web` (resume drop → Claude Fable 5.1 fills the profile when `ANTHROPIC_API_KEY` is set; live table; Excel download).
 
 - Never log in to LinkedIn, never click Easy Apply. One login wall skips a posting; if stdout says `LinkedIn login wall` or `LinkedIn rate limit` at the end, the partial Excel is already written — tell the user; retry later or with a smaller `--max-open` / larger `--delay`.

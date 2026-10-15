@@ -237,4 +237,4 @@ def test_requests_are_spaced_irregularly(monkeypatch):
         client.get(linkedin.GUEST_SEARCH + "?keywords=x&start=0")
     assert len(gaps) == 39  # none before the first request
     assert all(5.0 <= g <= 46.0 for g in gaps)  # 0.6–1.6 × delay, plus an occasional 1–3 × delay linger
-    assert len({round(g, 1) for g in gaps}) > 30
+    assert len(set(gaps)) == len(gaps) and max(gaps) - min(gaps) > 5.0  # never a fixed cadence

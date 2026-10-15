@@ -1,4 +1,4 @@
-"""jjh CLI: start / js / step / run / report / log / linkedin."""
+"""jjh CLI: start / js / step / run / report / log / linkedin / watch / web."""
 
 from __future__ import annotations
 
@@ -148,6 +148,28 @@ def cmd_linkedin(root: Path, ns) -> None:
                  mock=_mock(ns))
 
 
+def _range(text: str, cast=float) -> tuple:
+    """'30-60' → (30, 60). Used for --every (minutes) and --quiet (hours)."""
+    try:
+        lo, hi = (cast(x) for x in text.split("-", 1))
+    except ValueError:
+        raise SystemExit(f"ERROR: expected a range like 30-60, got {text!r}") from None
+    return lo, hi
+
+
+def cmd_watch(root: Path, ns) -> None:
+    from jev_job_hunter.watch import watch
+    every = _range(ns.every)
+    if not 0 < every[0] <= every[1]:
+        raise SystemExit(f"ERROR: --every {ns.every}: need 0 < min <= max")
+    quiet = None if ns.quiet.lower() == "none" else _range(ns.quiet, int)
+    if quiet and not all(0 <= h <= 23 for h in quiet):
+        raise SystemExit(f"ERROR: --quiet {ns.quiet}: hours are 0-23")
+    watch(root, profile_path=ns.profile or None, queries=ns.query or None, location=ns.location,
+          posted=ns.posted, remote=ns.remote, max_open=ns.max_open, delay=ns.delay, mock=_mock(ns),
+          every=every, quiet=quiet, once=ns.once)
+
+
 def cmd_web(root: Path, ns) -> None:
     from jev_job_hunter.web import serve
     serve(root, port=ns.port, open_browser=not ns.no_browser)
@@ -183,6 +205,18 @@ def cmd_log(root: Path, ns) -> None:
         print(f"{ts:<20} {cmd:<6} {stage:<10} {_n('links',5)} {_n('nav_ms',6)} {_n('extract_ms',6)} {_n('jev_ms',6)} {_n('total_ms',7)}  {action}")
 
 
+def _linkedin_args(p: argparse.ArgumentParser, posted_help: str) -> None:
+    p.add_argument("--profile", default="", help="default config/profile.yaml")
+    p.add_argument("--query", action="append", default=[], help="repeatable; default profile search.queries")
+    p.add_argument("--location", default=None)
+    p.add_argument("--posted", choices=("day", "week", "month", "any"), default=None, help=posted_help)
+    p.add_argument("--remote", choices=("any", "remote", "hybrid", "onsite"), default=None)
+    p.add_argument("--max-open", type=int, default=LINKEDIN_MAX_OPEN)
+    p.add_argument("--delay", type=float, default=LINKEDIN_DELAY,
+                   help="mean seconds between LinkedIn requests (jittered)")
+    p.add_argument("--mock", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jjh", description="Jev AI Job Hunter")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -207,16 +241,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("report").add_argument("--mock", action="store_true")
     sub.add_parser("log")
     li = sub.add_parser("linkedin", help="LinkedIn (logged out) → company ATS → Jev fit → Excel")
-    li.add_argument("--profile", default="", help="default config/profile.yaml")
-    li.add_argument("--query", action="append", default=[], help="repeatable; default profile search.queries")
-    li.add_argument("--location", default=None)
-    li.add_argument("--posted", choices=("day", "week", "month", "any"), default=None)
-    li.add_argument("--remote", choices=("any", "remote", "hybrid", "onsite"), default=None)
+    _linkedin_args(li, posted_help="default profile search.posted")
     li.add_argument("--max-cards", type=int, default=LINKEDIN_MAX_CARDS, help="per query")
-    li.add_argument("--max-open", type=int, default=LINKEDIN_MAX_OPEN)
-    li.add_argument("--delay", type=float, default=LINKEDIN_DELAY,
-                    help="mean seconds between LinkedIn requests (jittered)")
-    li.add_argument("--mock", action="store_true")
+    wa = sub.add_parser("watch", help="poll LinkedIn every 30-60 min, score only new jobs, one cumulative Excel")
+    _linkedin_args(wa, posted_help="default day")
+    wa.add_argument("--every", default="30-60", help="minutes between cycles, drawn at random (default 30-60)")
+    wa.add_argument("--quiet", default="1-7", help="local hours with no requests (default 1-7), or none")
+    wa.add_argument("--once", action="store_true", help="run one cycle and exit (for cron / launchd)")
     w = sub.add_parser("web", help="local site: drop a resume, watch jobs stream in, download Excel")
     w.add_argument("--port", type=int, default=8765)
     w.add_argument("--no-browser", action="store_true")
@@ -227,7 +258,7 @@ def main(argv=None) -> None:
     ns = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
     root = load_env()
     {"start": cmd_start, "js": cmd_js, "step": cmd_step, "run": cmd_run,
-     "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "web": cmd_web}[ns.cmd](root, ns)
+     "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "watch": cmd_watch, "web": cmd_web}[ns.cmd](root, ns)
 
 
 if __name__ == "__main__":

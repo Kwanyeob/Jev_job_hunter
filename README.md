@@ -42,6 +42,16 @@ uv run jjh linkedin --query "AI Engineer" --location "Seoul" --posted week --max
 
 LinkedIn public search over plain HTTP (logged out, no Chrome; 10 cards per request with irregular ~12 s pauses, `--delay` to change; 60 s → 120 s back-off on 429) → Jev triages card titles → the full posting from LinkedIn's guest endpoint (description + seniority / employment criteria; a company ATS page when LinkedIn exposes the apply URL, which it no longer does logged out) → Jev fit vs your profile → `results/linkedin-<time>.xlsx`. A login wall skips one posting and cools down; two in a row, or a 429 that outlasts the back-off, stop the hunt and still write what was scored. Evidence that logged out sees the same jobs: [`docs/evidence/`](docs/evidence/2026-10-12-linkedin-guest-vs-login.md).
 
+### Keep watching
+
+```bash
+uv run jjh watch                          # every 30–60 min (random), quiet 01–07, Ctrl+C to stop
+uv run jjh watch --every 20-40 --quiet 0-8
+uv run jjh watch --once                   # one cycle, for cron / launchd
+```
+
+Each cycle reads page 1 per query (deeper only while every card is new, up to 3 pages), and only jobs never seen before go to Jev. Seen job IDs live in `state/linkedin-watch.json`. Everything goes into one `results/linkedin-watch.xlsx` with a **First seen** column, and the latest cycle's rows are bold. When LinkedIn blocks a cycle, the next gap doubles (capped at 4 h). Picked jobs that were never read are retried next time. Same flags as `jjh linkedin` (except `--max-cards`); `--posted` defaults to `day`.
+
 ## Slow-motion (fixtures / narrated demos)
 
 ```bash

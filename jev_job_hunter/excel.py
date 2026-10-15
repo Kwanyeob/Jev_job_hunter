@@ -15,19 +15,21 @@ HEAD_FILL = PatternFill("solid", fgColor="1F2937")
 HEAD_FONT = Font(bold=True, color="FFFFFF")
 SAVE_FILL = PatternFill("solid", fgColor="DCFCE7")
 LINK_FONT = Font(color="2563EB", underline="single")
+NEW_FONT = Font(bold=True)  # rows first seen in the latest `jjh watch` cycle
 
 MATCH_COLS = (
     ("Rank", 6, None), ("Overall fit", 11, "fit"), ("Title", 42, "title"), ("Company", 22, "company"),
     ("Location", 22, "location"), ("Role", 8, "role_match"), ("Skills", 8, "skills_match"),
     ("Seniority", 10, "seniority_match"), ("Location fit", 11, "location_match"),
     ("Level", 16, "level"), ("Apply via", 14, "apply_type"), ("Read from", 10, "source"),
-    ("Posted", 12, "posted"), ("Updated", 14, "posted_text"),
+    ("Posted", 12, "posted"), ("Updated", 14, "posted_text"), ("First seen", 16, "first_seen"),
     ("Apply / ATS", 16, "apply_url"), ("LinkedIn", 12, "href"), ("Job ID", 14, "id"), ("Query", 20, "query"),
 )
 LIST_COLS = (
     ("Open score", 11, "open"), ("Opened", 8, "opened"), ("Title", 42, "title"),
     ("Company", 22, "company"), ("Location", 22, "location"), ("Posted", 12, "posted"),
-    ("Updated", 14, "posted_text"), ("LinkedIn", 12, "href"), ("Job ID", 14, "id"), ("Query", 20, "query"),
+    ("Updated", 14, "posted_text"), ("First seen", 16, "first_seen"), ("LinkedIn", 12, "href"),
+    ("Job ID", 14, "id"), ("Query", 20, "query"),
 )
 PCT_KEYS = {"fit", "role_match", "skills_match", "seniority_match", "location_match", "open"}
 LINK_KEYS = {"apply_url", "href"}
@@ -42,7 +44,7 @@ def _header(ws, cols) -> None:
     ws.freeze_panes = "A2"
 
 
-def _row(ws, r: int, cols, rec: dict, rank: int | None = None) -> None:
+def _row(ws, r: int, cols, rec: dict, rank: int | None = None, bold: bool = False) -> None:
     for c, (_, _, key) in enumerate(cols, 1):
         val = rank if key is None else rec.get(key)
         cell = ws.cell(row=r, column=c)
@@ -53,6 +55,8 @@ def _row(ws, r: int, cols, rec: dict, rank: int | None = None) -> None:
         if key == "opened":
             val = "Y" if val else ""
         cell.value = val
+        if bold:
+            cell.font = NEW_FONT
         if key in PCT_KEYS and isinstance(val, (int, float)):
             cell.number_format = "0%"
 
@@ -67,13 +71,14 @@ def _scale(ws, col: int, last: int) -> None:
         end_type="num", end_value=1, end_color="86EFAC"))
 
 
-def write_xlsx(path: Path, matches: list[dict], listings: list[dict], meta: dict) -> Path:
+def write_xlsx(path: Path, matches: list[dict], listings: list[dict], meta: dict,
+               new_ids: frozenset[str] = frozenset()) -> Path:
     wb = Workbook()
     ws = wb.active
     ws.title = "Matches"
     _header(ws, MATCH_COLS)
     for i, m in enumerate(matches, 1):
-        _row(ws, i + 1, MATCH_COLS, m, rank=i)
+        _row(ws, i + 1, MATCH_COLS, m, rank=i, bold=m.get("id") in new_ids)
         if (m.get("fit") or 0) >= FIT_SAVE_THRESHOLD:
             for c in range(1, 6):
                 ws.cell(row=i + 1, column=c).fill = SAVE_FILL
@@ -83,7 +88,7 @@ def write_xlsx(path: Path, matches: list[dict], listings: list[dict], meta: dict
     wl = wb.create_sheet("All listings")
     _header(wl, LIST_COLS)
     for i, rec in enumerate(listings, 2):
-        _row(wl, i, LIST_COLS, rec)
+        _row(wl, i, LIST_COLS, rec, bold=rec.get("id") in new_ids)
     _scale(wl, 1, len(listings) + 1)
     wl.auto_filter.ref = f"A1:{get_column_letter(len(LIST_COLS))}{max(1, len(listings) + 1)}"
 

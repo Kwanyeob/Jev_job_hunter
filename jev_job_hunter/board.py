@@ -160,3 +160,27 @@ def print_li_report(matches: list[dict], n_cards: int, path, elapsed: float) -> 
         print("  (no evaluated jobs)")
     print(f"  Excel  {path}")
     print(BAR)
+
+
+def print_watch_start(state_path, n_seen: int, every, quiet, once: bool) -> None:
+    gap = "once" if once else f"every {every[0]:g}–{every[1]:g} min"
+    rest = f"quiet {quiet[0]:02d}–{quiet[1]:02d}" if quiet else "no quiet hours"
+    print(f"  WATCH      {gap}  ·  {rest}  ·  {n_seen} jobs already seen")
+    print(f"  State      {state_path}")
+    print(BAR, flush=True)
+
+
+def print_watch_cycle(summary: dict, next_at) -> None:
+    print(BAR)
+    print(f"  WATCH  {summary['at']}  ·  new {summary['new']}  ·  scored {summary['scored']}  ·  "
+          f"strong {summary['strong']}  ·  {summary['requests']} LinkedIn requests")
+    print(f"  Total  {summary['listings']} listings  ·  {summary['matches']} scored")
+    if summary.get("error"):
+        print(f"  !      {summary['error']} — saved what was read")
+    for m in summary.get("strong_matches") or []:
+        print(f"  ★ {_pct(m.get('fit'))}  {m.get('title', '')}  ·  {m.get('company', '')}\n"
+              f"         {m.get('apply_url') or m.get('href')}")
+    print(f"  Excel  {summary['xlsx']}")
+    if next_at is not None:
+        print(f"  Next   {next_at:%Y-%m-%d %H:%M}")
+    print(BAR, flush=True)
