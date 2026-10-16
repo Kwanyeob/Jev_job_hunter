@@ -13,6 +13,7 @@ Jev AI Job Hunter is a coding-agent skill and CLI (`jjh`). Collectors gather job
 | `jjh linkedin` | `config/profile.yaml` → LinkedIn search → Jev triages titles → reads the top postings → Jev fit → `results/linkedin-<time>.xlsx` | **Plain HTTP** to LinkedIn guest endpoints (no Chrome, logged out) | Live-verified 2026-10-12 with `--mock` Jev |
 | `jjh watch` | Polls the same search every 30–60 min (random), scores only unseen jobs, and keeps one `results/linkedin-watch.xlsx` | Plain HTTP | Live-verified 2026-10-14 with `--mock` Jev: `--once` twice, plus a 9-cycle loop |
 | `jjh web` | Local page on `127.0.0.1:8765`: drop a resume PDF → Claude Fable 5.1 drafts the profile → live table → Excel download | Runs `jjh linkedin` underneath | Covered by `tests/test_web.py`; not run by hand since the HTTP switch |
+| `jjh serve` (+ `invite` / `revoke` / `users`) | Invite-only multi-user web service: per-user profile, watch, results, Excel. One scheduler thread runs all users' cycles one at a time. | Starlette + uvicorn; LinkedIn over plain HTTP | Branch `friends-service` (2026-10-16). Live-verified locally with **real Jev**: one cycle, 30 cards → 10 read and scored, 17 requests, three 429s (reads are now capped at 5 per cycle). Not deployed yet. |
 | `scripts/li_compare.py` | Compares logged-out vs logged-in LinkedIn results by job ID | stdlib HTTP + DevTools snippet | Used once; see the evidence doc below |
 
 ## LinkedIn pipeline (the active work)
@@ -64,6 +65,14 @@ profile.yaml ──► search_queries ──► score_cards ──► Excel / st
 - **LinkedIn's User Agreement prohibits automated collection.** Volume is kept low (about one request per query per watch cycle), but the risk is not zero.
 - **`chrome.ensure_chrome` is now unused.** It was kept for possible `jjh run` use.
 - **Ruff reports style warnings** under the global config, such as `re.S` aliases and import order. These match the existing code style.
+
+## Friends service (in progress)
+
+The goal is to give 1–2 friends a hosted, invite-link service. Plan: `~/.claude/plans/vectorized-rolling-sprout.md`.
+- Phases 1–2 (multi-user web + scheduler) are done on branch `friends-service`.
+- Phase 3 (Docker + Fly.io deploy, `docs/OPERATIONS.md`, a check of whether LinkedIn blocks the cloud IP) is postponed by the user.
+- It needs a Fly.io account and `ANTHROPIC_API_KEY`.
+- `TYPESAFE_API_KEY` has been set in `.env` since 2026-10-16.
 
 ## Next steps (not started)
 
