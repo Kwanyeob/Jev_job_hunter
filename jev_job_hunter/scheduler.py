@@ -25,7 +25,7 @@ from jev_job_hunter.watch import (
 
 GAP_BETWEEN = (60.0, 180.0)  # seconds between two cycles, whoever they belong to
 MAX_QUERIES = 3              # per user, so the operator's Jev quota and LinkedIn stay comfortable
-MAX_OPEN = 10                # postings read and fit-scored per cycle
+MAX_OPEN = 5                 # postings read per cycle; the rest wait for the next one (fewer 429s)
 STATE_KEY = "web"            # one watch state per user, kept across profile edits
 EVENTS_KEPT = 500
 IDLE_POLL = 30.0
@@ -149,7 +149,7 @@ class Scheduler:
             s["next_run"] = (next_run_at(self.clock(), self.every, self.quiet, s["backoff"], self.rng)
                              .isoformat(timespec="seconds") if s["enabled"] else None)
             self._save(uid, s)
-        emit("cycle", {k: summary.get(k) for k in ("at", "new", "scored", "strong", "listings", "matches", "error")}
+        emit("cycle", {k: summary.get(k) for k in ("at", "new", "scored", "strong", "listings", "matches", "pending", "error")}
              | {"next_run": s["next_run"]})
         return summary
 

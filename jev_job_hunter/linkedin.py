@@ -354,21 +354,36 @@ def search_queries(client: GuestClient, queries: list[str], location: str, poste
     return found
 
 
+def worth_reading(cards: list[dict]) -> list[dict]:
+    """Cards Jev rated worth opening, best first."""
+    return sorted((c for c in cards if (c.get("open") or 0) >= LINKEDIN_OPEN_THRESHOLD),
+                  key=lambda c: c["open"], reverse=True)
+
+
 def score_cards(root: Path, cand: dict, hunt_query: str, cards: list[dict], client: GuestClient,
                 matches: list[dict], *, max_open: int, mock: bool, emit=_noop, stop=None) -> None:
     """Jev triage of every card, then read + Jev fit the top `max_open`. Appends to `matches` as it
     goes, so a login wall / rate limit / stop raised from here leaves the finished ones in place."""
     emit("status", {"msg": f"Jev is triaging {len(cards)} titles"})
     jev_ms = triage(cand, hunt_query, cards, mock)
-    picked = sorted((c for c in cards if c["open"] >= LINKEDIN_OPEN_THRESHOLD),
-                    key=lambda c: c["open"], reverse=True)[:max_open]
+    picked = worth_reading(cards)[:max_open]
+    report_triage(root, cards, picked, jev_ms, emit)
+    read_cards(root, cand, picked, client, matches, mock=mock, emit=emit, stop=stop)
+
+
+def report_triage(root: Path, cards: list[dict], picked: list[dict], jev_ms: int, emit=_noop) -> None:
     for c in picked:
         c["opened"] = True
-    emit("triage", {"scores": {c["id"]: c["open"] for c in cards},
+    emit("triage", {"scores": {c["id"]: c.get("open") for c in cards},
                     "picked": [c["id"] for c in picked], "jev_ms": jev_ms})
     board.print_li_triage(cards, picked, jev_ms)
     append_log(root, {"cmd": "linkedin", "stage": "triage", "links": len(cards),
                       "jev_ms": jev_ms, "action": f"OPEN {len(picked)}"})
+
+
+def read_cards(root: Path, cand: dict, picked: list[dict], client: GuestClient, matches: list[dict], *,
+               mock: bool, emit=_noop, stop=None) -> None:
+    """Read each picked posting and Jev-fit it, appending to `matches` as each one finishes."""
     walls = 0
     for n, c in enumerate(picked, 1):
         _check(stop)

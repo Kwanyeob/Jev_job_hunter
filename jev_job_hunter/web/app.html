@@ -219,7 +219,8 @@ function showWatch(w) {
   const last = w.last;
   $("last").textContent = last ? when(last.at) : "없음";
   $("last-result").innerHTML = last ? (last.error ? `<span style="color:var(--bad)">${esc(last.error)}</span>`
-    : `새 공고 <b>${last.new}</b> · 평가 <b>${last.scored}</b> · 잘 맞음 <b>${last.strong}</b>`) : "";
+    : `새 공고 <b>${last.new}</b> · 평가 <b>${last.scored}</b> · 잘 맞음 <b>${last.strong}</b>`
+      + (last.pending ? ` · 다음에 읽을 공고 <b>${last.pending}</b>` : "")) : "";
   $("run-now").disabled = !!(w.running || w.queued);
 }
 
