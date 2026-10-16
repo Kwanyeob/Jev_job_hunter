@@ -1,4 +1,4 @@
-"""jjh CLI: start / js / step / run / report / log / linkedin / watch / web."""
+"""jjh CLI: start / js / step / run / report / log / linkedin / watch / web / serve / invite / revoke / users."""
 
 from __future__ import annotations
 
@@ -170,6 +170,44 @@ def cmd_watch(root: Path, ns) -> None:
           every=every, quiet=quiet, once=ns.once)
 
 
+def _data_dir(root: Path) -> Path:
+    return Path(os.environ.get("JJH_DATA_DIR") or root / "data")
+
+
+def _public_url() -> str:
+    return (os.environ.get("PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/")
+
+
+def cmd_serve(root: Path, ns) -> None:
+    from jev_job_hunter.server import serve
+    serve(_data_dir(root), host=ns.host, port=ns.port, public_url=_public_url())
+
+
+def cmd_invite(root: Path, ns) -> None:
+    from jev_job_hunter.users import Users
+    user, token = Users(_data_dir(root)).invite(ns.name)
+    print(f"  {user.name}: {_public_url()}/invite/{token}")
+    print("  Send this link privately. It is shown once; inviting the same name again replaces it.")
+
+
+def cmd_revoke(root: Path, ns) -> None:
+    from jev_job_hunter.users import Users
+    try:
+        user = Users(_data_dir(root)).revoke(ns.name, delete=ns.delete)
+    except KeyError:
+        raise SystemExit(f"ERROR: no user named {ns.name!r}") from None
+    print(f"  {user.name}: {'deleted with all their data' if ns.delete else 'revoked (data kept)'}")
+
+
+def cmd_users(root: Path, ns) -> None:
+    from jev_job_hunter.users import Users
+    rows = Users(_data_dir(root)).all()
+    if not rows:
+        print("(no users — create one with: jjh invite <name>)")
+    for u in rows:
+        print(f"  {u.name:<20} {u.id}  since {u.created}{'  REVOKED' if u.revoked else ''}")
+
+
 def cmd_web(root: Path, ns) -> None:
     from jev_job_hunter.web import serve
     serve(root, port=ns.port, open_browser=not ns.no_browser)
@@ -248,6 +286,15 @@ def build_parser() -> argparse.ArgumentParser:
     wa.add_argument("--every", default="30-60", help="minutes between cycles, drawn at random (default 30-60)")
     wa.add_argument("--quiet", default="1-7", help="local hours with no requests (default 1-7), or none")
     wa.add_argument("--once", action="store_true", help="run one cycle and exit (for cron / launchd)")
+    sv = sub.add_parser("serve", help="invite-only web service with per-user watch (data in $JJH_DATA_DIR or data/)")
+    sv.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    sv.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
+    inv = sub.add_parser("invite", help="create (or renew) a user's invite link")
+    inv.add_argument("name")
+    rv = sub.add_parser("revoke", help="block a user; --delete also removes their data")
+    rv.add_argument("name")
+    rv.add_argument("--delete", action="store_true")
+    sub.add_parser("users", help="list users")
     w = sub.add_parser("web", help="local site: drop a resume, watch jobs stream in, download Excel")
     w.add_argument("--port", type=int, default=8765)
     w.add_argument("--no-browser", action="store_true")
@@ -258,7 +305,8 @@ def main(argv=None) -> None:
     ns = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
     root = load_env()
     {"start": cmd_start, "js": cmd_js, "step": cmd_step, "run": cmd_run,
-     "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "watch": cmd_watch, "web": cmd_web}[ns.cmd](root, ns)
+     "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "watch": cmd_watch, "web": cmd_web,
+     "serve": cmd_serve, "invite": cmd_invite, "revoke": cmd_revoke, "users": cmd_users}[ns.cmd](root, ns)
 
 
 if __name__ == "__main__":

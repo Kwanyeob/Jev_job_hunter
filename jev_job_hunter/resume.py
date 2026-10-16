@@ -1,4 +1,4 @@
-"""Resume PDF → {candidate, search} profile with Claude (structured output).
+"""Resume PDF → {candidate, search} profile with Claude Sonnet 5.5 (structured output).
 
 Any layout, field, or language: the PDF goes to Claude as a document and comes back as
 JSON matching PROFILE_SCHEMA. The schema has no contact fields, so name / email / phone
@@ -12,7 +12,7 @@ import json
 import os
 from datetime import date
 
-MODEL = "claude-fable-5-1"
+MODEL = "claude-sonnet-5-5"  # about $0.04 per resume; one call per resume, the user can edit the result
 
 _LIST = {"type": "array", "items": {"type": "string"}}
 PROFILE_SCHEMA = {
@@ -102,7 +102,8 @@ def extract_profile(pdf: bytes, client=None) -> dict:
             max_tokens=16000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
-            output_config={"format": {"type": "json_schema", "schema": PROFILE_SCHEMA}},
+            output_config={"effort": "medium",
+                           "format": {"type": "json_schema", "schema": PROFILE_SCHEMA}},
             messages=[{"role": "user", "content": [
                 {"type": "document", "source": {
                     "type": "base64", "media_type": "application/pdf",

@@ -112,7 +112,7 @@ def wait_until(at: datetime, clock=datetime.now, sleeper=time.sleep) -> None:
 
 def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], location: str,
               posted: str, remote: str, *, max_open: int, delay: float, mock: bool,
-              client: GuestClient | None = None, clock=datetime.now) -> dict:
+              client: GuestClient | None = None, clock=datetime.now, emit=None) -> dict:
     """One poll: search page 1 per query (more only while every card is unseen), score the new ones,
     fold them into the state and rewrite the cumulative Excel. Returns a cycle summary."""
     cand = prof["candidate"]
@@ -123,13 +123,15 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     cards: list[dict] = []
     matches: list[dict] = []
     error, stopped = "", False
+    events = {"emit": emit} if emit else {}  # `emit(kind, data)` streams progress to the web UI
     try:
         cards = search_queries(client, queries, location, posted, remote, WATCH_MAX_PAGES * PAGE_SIZE,
-                               seen=set(state.seen), stop_at_seen=True)
+                               seen=set(state.seen), stop_at_seen=True, **events)
         for c in cards:
             c["first_seen"] = stamp
         if cards:
-            score_cards(root, cand, " | ".join(queries), cards, client, matches, max_open=max_open, mock=mock)
+            score_cards(root, cand, " | ".join(queries), cards, client, matches, max_open=max_open, mock=mock,
+                        **events)
     except AuthWall as e:
         error = f"LinkedIn login wall ({e})"
     except RateLimited as e:

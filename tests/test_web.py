@@ -43,7 +43,7 @@ def test_extract_profile_request_shape():
     got = resume.extract_profile(b"%PDF-1.7 fake", client=client)
     assert got == PROFILE
     kw = client.kw
-    assert kw["model"] == "claude-fable-5-1"
+    assert kw["model"] == "claude-sonnet-5-5" and kw["output_config"]["effort"] == "medium"
     assert kw["fallbacks"] == "default" and kw["betas"] == ["server-side-fallback-2026-07-01"]
     assert "thinking" not in kw
     schema = kw["output_config"]["format"]["schema"]
