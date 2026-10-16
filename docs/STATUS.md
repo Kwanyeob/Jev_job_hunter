@@ -58,7 +58,7 @@ profile.yaml ──► search_queries ──► score_cards ──► Excel / st
 
 ## Not verified / known gaps
 
-- **Real Jev has not been run in this period.** Every live run since 2026-10-12 used `--mock`, because there is no `.env` yet (copy `.env.example`, then set `TYPESAFE_API_KEY`).
+- **Real Jev has been run once:** a single `jjh serve` cycle on 2026-10-16. `jjh linkedin` / `jjh watch` from the CLI have still only been run with `--mock`.
 - **There is no `config/profile.yaml` yet.** The live runs used `config/profile.example.yaml`.
 - **Company apply URLs are missing logged out.** LinkedIn hides them, so most postings are scored from LinkedIn's own description rather than the ATS page.
 - **The parsers depend on LinkedIn's HTML class names.** A markup change breaks them. The fixtures in `tests/fixtures/li_guest_*.html` show the expected shape.
