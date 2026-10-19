@@ -114,12 +114,35 @@ def test_blocked_cycle_keeps_progress_and_retries_unread(tmp_path, profile, monk
     prof = load_profile(ROOT, str(profile))
     blocked = _cycle(tmp_path, prof, BlockedPostings(), T0)
     assert "rate limit" in blocked["error"] and blocked["scored"] == 0
-    assert blocked["new"] == 1  # the two picked-but-unread cards stay unseen
-    assert load_workbook(blocked["xlsx"])["All listings"].max_row == 2
+    assert blocked["new"] == 3 and blocked["pending"] == 2  # the two picked-but-unread jobs wait
+    assert load_workbook(blocked["xlsx"])["All listings"].max_row == 4
 
     site = FakeLinkedIn()
     retry = _cycle(tmp_path, prof, site, T0 + timedelta(hours=1))
-    assert (retry["new"], retry["scored"], retry["error"]) == (2, 2, "")
+    assert (retry["new"], retry["scored"], retry["pending"], retry["error"]) == (0, 2, 0, "")
+    assert _postings_read(site) >= 2  # read straight from the queue, no re-triage needed
+
+
+def _cycle_n(tmp_path, prof, site, at, max_open) -> dict:
+    state = WatchState.load(tmp_path, watch_key(QUERIES, "South Korea", "day", "any"))
+    with redirect_stdout(io.StringIO()):
+        return run_cycle(tmp_path, state, prof, QUERIES, "South Korea", "day", "any",
+                         max_open=max_open, delay=0, mock=True, client=fake_client(site), clock=lambda: at)
+
+
+def test_reads_are_spread_across_cycles(tmp_path, profile, jev_calls):
+    prof = load_profile(ROOT, str(profile))
+    first = _cycle_n(tmp_path, prof, FakeLinkedIn(), T0, max_open=1)
+    assert (first["new"], first["scored"], first["pending"]) == (3, 1, 1)
+
+    jev_calls.clear()
+    site = FakeLinkedIn()
+    second = _cycle_n(tmp_path, prof, site, T0 + timedelta(minutes=40), max_open=1)
+    assert (second["new"], second["scored"], second["pending"]) == (0, 1, 0)
+    assert _postings_read(site) >= 1
+    assert all("open_0" not in q for q in jev_calls)  # the queued job was not triaged again
+    state = WatchState.load(tmp_path, watch_key(QUERIES, "South Korea", "day", "any"))
+    assert sum(1 for c in state.listings if c.get("opened")) == 2 and len(state.matches) == 2
 
 
 def test_state_file_per_search(tmp_path):

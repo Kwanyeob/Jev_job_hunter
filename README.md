@@ -52,6 +52,27 @@ uv run jjh watch --once                   # one cycle, for cron / launchd
 
 Each cycle reads page 1 per query (deeper only while every card is new, up to 3 pages), and only jobs never seen before go to Jev. Seen job IDs live in `state/linkedin-watch.json`. Everything goes into one `results/linkedin-watch.xlsx` with a **First seen** column, and the latest cycle's rows are bold. When LinkedIn blocks a cycle, the next gap doubles (capped at 4 h). Picked jobs that were never read are retried next time. Same flags as `jjh linkedin` (except `--max-cards`); `--posted` defaults to `day`.
 
+### Invite-only web service (`jjh serve`)
+
+For a few friends who just open a link and use it:
+
+```bash
+uv run jjh invite "Minsu"     # prints a private invite link (shown once; re-run to replace it)
+uv run jjh serve              # http://127.0.0.1:8000, scheduler included; HOST / PORT / PUBLIC_URL / JJH_DATA_DIR env
+uv run jjh users              # list; jjh revoke "Minsu" [--delete]
+```
+
+What a friend can do (Korean UI):
+- Open their link to log in. A signed 90-day cookie keeps them logged in; there are no passwords.
+- Drop a resume. Claude Sonnet 5.5 drafts the profile. The PDF is never stored, and contact details are dropped.
+- Turn the watch on and see results accumulate, or download them as Excel.
+
+How the server works:
+- One scheduler runs everyone's cycles strictly one at a time, with 1–3 min gaps between them.
+- Each cycle reads at most 5 postings. The rest queue for the next cycle.
+- Each user's data lives in `data/users/<id>/`.
+- Server-side keys go in `.env`: `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, and optionally `SECRET_KEY`.
+
 ## Slow-motion (fixtures / narrated demos)
 
 ```bash

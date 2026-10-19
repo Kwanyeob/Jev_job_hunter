@@ -19,6 +19,7 @@ DEMO.md
 # hunt runtime
 state/
 results/
+data/
 
 # python / tooling
 .venv/

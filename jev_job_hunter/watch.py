@@ -18,7 +18,8 @@ from pathlib import Path
 from jev_job_hunter import board
 from jev_job_hunter.excel import write_xlsx
 from jev_job_hunter.linkedin import (
-    PAGE_SIZE, AuthWall, GuestClient, RateLimited, Stopped, hunt_meta, score_cards, search_queries,
+    PAGE_SIZE, AuthWall, GuestClient, RateLimited, Stopped, hunt_meta, read_cards, report_triage,
+    search_queries, triage, worth_reading,
 )
 from jev_job_hunter.profile import load_profile
 from jev_job_hunter.questions import FIT_SAVE_THRESHOLD
@@ -32,6 +33,7 @@ BACKOFF_MAX = 8              # gap multiplier cap after blocked cycles
 GAP_CAP_MIN = 240.0          # a backed-off gap never exceeds 4 h
 WAKE_JITTER_MIN = 20.0       # leave quiet hours at end + 0–20 min
 CYCLES_KEPT = 50
+PENDING_MAX = 30             # triaged jobs waiting for a read slot; the lowest-rated fall off
 TICK = 30.0                  # seconds per sleep slice, so a laptop waking from sleep catches up
 
 
@@ -49,6 +51,7 @@ class WatchState:
         self.listings: list[dict] = data.get("listings") or []
         self.matches: list[dict] = data.get("matches") or []
         self.cycles: list[dict] = data.get("cycles") or []
+        self.pending: list[dict] = data.get("pending") or []  # worth reading, not read yet
 
     @classmethod
     def load(cls, root: Path, key: str) -> WatchState:
@@ -71,7 +74,8 @@ class WatchState:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"key": self.key, "seen": self.seen, "listings": self.listings,
-                                   "matches": self.matches, "cycles": self.cycles[-CYCLES_KEPT:]},
+                                   "matches": self.matches, "cycles": self.cycles[-CYCLES_KEPT:],
+                                   "pending": self.pending},
                                   indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
         os.replace(tmp, self.path)
 
@@ -112,9 +116,11 @@ def wait_until(at: datetime, clock=datetime.now, sleeper=time.sleep) -> None:
 
 def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], location: str,
               posted: str, remote: str, *, max_open: int, delay: float, mock: bool,
-              client: GuestClient | None = None, clock=datetime.now) -> dict:
-    """One poll: search page 1 per query (more only while every card is unseen), score the new ones,
-    fold them into the state and rewrite the cumulative Excel. Returns a cycle summary."""
+              client: GuestClient | None = None, clock=datetime.now, emit=None) -> dict:
+    """One poll: search page 1 per query (more only while every card is unseen), Jev-triage the new
+    cards, then read + fit up to `max_open` of the best-rated jobs waiting (earlier cycles' leftovers
+    and this cycle's). The rest wait in `state.pending` for the next cycle, which keeps each cycle's
+    LinkedIn reads few. Folds everything into the state and rewrites the cumulative Excel."""
     cand = prof["candidate"]
     own = client is None
     client = client or GuestClient(delay)
@@ -122,14 +128,23 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     stamp = started.strftime("%Y-%m-%d %H:%M")
     cards: list[dict] = []
     matches: list[dict] = []
+    queue = worth_reading(state.pending)
+    to_read: list[dict] = []
     error, stopped = "", False
+    events = {"emit": emit} if emit else {}  # `emit(kind, data)` streams progress to the web UI
     try:
         cards = search_queries(client, queries, location, posted, remote, WATCH_MAX_PAGES * PAGE_SIZE,
-                               seen=set(state.seen), stop_at_seen=True)
+                               seen=set(state.seen), stop_at_seen=True, **events)
         for c in cards:
             c["first_seen"] = stamp
         if cards:
-            score_cards(root, cand, " | ".join(queries), cards, client, matches, max_open=max_open, mock=mock)
+            (emit or (lambda *a: None))("status", {"msg": f"Jev is triaging {len(cards)} titles"})
+            jev_ms = triage(cand, " | ".join(queries), cards, mock)
+            queue = worth_reading(queue + cards)
+        to_read, queue = queue[:max_open], queue[max_open:]
+        if cards or to_read:
+            report_triage(root, cards, to_read, jev_ms if cards else 0, **events)
+        read_cards(root, cand, to_read, client, matches, mock=mock, **events)
     except AuthWall as e:
         error = f"LinkedIn login wall ({e})"
     except RateLimited as e:
@@ -140,20 +155,25 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
         if own:
             client.close()
 
-    # Cards picked for a read that never happened (blocked / stopped) stay unseen, so the next
-    # cycle triages and reads them again instead of losing them.
+    # Picked jobs a block or stop kept us from reading go back to the front of the queue.
     read = {m["id"] for m in matches}
-    keep = [c for c in cards if not (error and c.get("opened") and c["id"] not in read)]
-    for c in keep:
+    unread = [c for c in to_read if c["id"] not in read]
+    for c in unread:
+        c["opened"] = False
+    state.pending = worth_reading(unread + queue)[:PENDING_MAX]
+    for c in cards:
         state.seen[c["id"]] = stamp
-    state.listings += keep
+    state.listings += cards
+    for c in state.listings:  # jobs read this cycle may have been listed in an earlier one
+        if c["id"] in read:
+            c["opened"] = True
     state.matches += matches
 
     strong = sorted((m for m in matches if (m.get("fit") or 0) >= FIT_SAVE_THRESHOLD),
                     key=lambda m: m["fit"], reverse=True)
-    summary = {"at": stamp, "new": len(keep), "scored": len(matches), "strong": len(strong),
+    summary = {"at": stamp, "new": len(cards), "scored": len(matches), "strong": len(strong),
                "requests": client.requests, "listings": len(state.listings), "matches": len(state.matches),
-               "error": error}
+               "pending": len(state.pending), "error": error}
     state.cycles.append(summary)
     state.save()
     meta = {**hunt_meta(prof, queries, location, posted, remote, mock), "watch.state": str(state.path),
@@ -161,10 +181,10 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     xlsx = write_xlsx(state.xlsx,
                       sorted(state.matches, key=lambda m: m.get("fit") or 0, reverse=True),
                       sorted(state.listings, key=lambda c: c.get("open") or 0, reverse=True),
-                      meta, new_ids=frozenset(c["id"] for c in keep))
-    append_log(root, {"cmd": "watch", "stage": "cycle", "links": len(keep),
+                      meta, new_ids=frozenset(c["id"] for c in cards))
+    append_log(root, {"cmd": "watch", "stage": "cycle", "links": len(cards),
                       "total_ms": int((clock() - started).total_seconds() * 1000),
-                      "action": error or f"NEW {len(keep)}"})
+                      "action": error or f"NEW {len(cards)}"})
     return {**summary, "stopped": stopped, "xlsx": str(xlsx), "strong_matches": strong}
 
 

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JevScout</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
+    --accent: #2f5bd3; --accent-ink: #ffffff; --good: #1f8a4c; --warn: #b7791f; --bad: #c0392b;
+    --chip: #eef1fb; --row-hi: #f1f8f3; --drop: #f2f4fb; --new: #fff7e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c9b95; --line: #33332f;
+      --accent: #7c9cf5; --accent-ink: #0f1115; --good: #5cc98a; --warn: #e0b35a; --bad: #ef7a6c;
+      --chip: #262b3a; --row-hi: #1d2a22; --drop: #1c2030; --new: #2e2a1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.55 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--muted); }
+  .who { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .banner { background: var(--new); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 13px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  h2 .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+          display: inline-grid; place-items: center; font-size: 12px; }
+  #drop { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 22px 16px; text-align: center;
+          background: var(--drop); cursor: pointer; margin-bottom: 14px; }
+  #drop.over { border-color: var(--accent); }
+  #drop strong { display: block; font-size: 15px; margin-bottom: 2px; }
+  #drop input { display: none; }
+  .msg { margin-top: 8px; min-height: 1.4em; color: var(--muted); }
+  .msg.err { color: var(--bad); }
+  .msg.ok { color: var(--good); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 16px; }
+  .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 60px; resize: vertical; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .switch { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
+  .switch input { width: 18px; height: 18px; }
+  .facts { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 13px; }
+  .facts b { color: var(--ink); font-weight: 600; }
+  #live { margin-top: 10px; color: var(--accent); min-height: 1.4em; }
+  .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .tools input[type=text] { max-width: 260px; }
+  .count { color: var(--muted); font-size: 13px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); white-space: nowrap; }
+  tr.fit-hi td { background: var(--row-hi); }
+  tr.fresh td:first-child { box-shadow: inset 3px 0 var(--warn); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .title { font-weight: 600; }
+  .dim { color: var(--muted); }
+  a { color: var(--accent); }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--chip); white-space: nowrap; }
+  .tag.new { background: var(--new); color: var(--warn); }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>JevScout</h1>
+    <span class="sub">이력서에 맞는 LinkedIn 공고를 자동으로 찾아 드립니다</span>
+    <span class="who" id="who"></span>
+  </header>
+  <div class="banner" id="mock-banner" hidden>지금은 테스트 모드입니다. 적합도 점수가 실제 평가가 아니라 키워드 규칙으로 계산됩니다.</div>
+
+  <section>
+    <h2><span class="n">1</span>이력서와 프로필</h2>
+    <label id="drop" for="file">
+      <strong>이력서 PDF를 여기에 끌어다 놓으세요</strong>
+      <span class="dim">또는 눌러서 파일을 고르세요. AI가 한 번 읽고 아래 프로필을 채웁니다. 이름·연락처는 저장하지 않습니다.</span>
+      <input type="file" id="file" accept="application/pdf,.pdf">
+    </label>
+    <div class="grid">
+      <div class="wide"><label for="headline">한 줄 소개</label><input type="text" id="headline"></div>
+      <div class="wide"><label for="summary">경력 요약</label><textarea id="summary"></textarea></div>
+      <div><label for="years">경력 (년)</label><input type="number" id="years" min="0" step="0.5"></div>
+      <div><label for="seniority">연차 수준</label>
+        <select id="seniority"><option value="intern">인턴</option><option value="entry">신입</option><option value="mid" selected>경력 (주니어~미들)</option><option value="senior">시니어</option><option value="staff">스태프 이상</option></select></div>
+      <div class="wide"><label for="skills">기술</label><input type="text" id="skills"><div class="hint">쉼표로 구분</div></div>
+      <div><label for="roles">희망 직무</label><input type="text" id="roles"><div class="hint">쉼표로 구분 (필수)</div></div>
+      <div><label for="locations">희망 근무지</label><input type="text" id="locations"></div>
+      <div><label for="languages">언어</label><input type="text" id="languages"></div>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="wide"><label for="queries">LinkedIn 검색어</label><input type="text" id="queries">
+        <div class="hint" id="queries-hint">쉼표로 구분, 최대 3개 (예: Backend Engineer, AI Engineer)</div></div>
+      <div><label for="location">검색 지역</label><input type="text" id="location" placeholder="예: Seoul, South Korea"></div>
+      <div><label for="remote">근무 형태</label>
+        <select id="remote"><option value="any">상관없음</option><option value="remote">원격</option><option value="hybrid">하이브리드</option><option value="onsite">출근</option></select></div>
+    </div>
+    <div class="row"><button class="primary" id="save">프로필 저장</button></div>
+    <div class="msg" id="profile-msg"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>자동 수집</h2>
+    <label class="switch"><input type="checkbox" id="watch"> 30~60분마다 새 공고 찾기 <span class="dim">(새벽 1~7시는 쉼)</span></label>
+    <div class="facts">
+      <span>마지막 실행 <b id="last">없음</b></span>
+      <span>다음 실행 <b id="next">-</b></span>
+      <span id="last-result"></span>
+    </div>
+    <div class="row"><button id="run-now">지금 한 번 찾기</button></div>
+    <div id="live"></div>
+    <div class="msg" id="watch-msg"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>찾은 공고</h2>
+    <div class="tools">
+      <input type="text" id="filter" placeholder="제목, 회사, 지역으로 거르기">
+      <label class="switch" style="font-size:13px"><input type="checkbox" id="only-scored"> 적합도 평가된 것만</label>
+      <span class="count" id="count"></span>
+      <span style="flex:1"></span>
+      <button id="export" disabled>Excel 다운로드</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>공고</th><th>회사</th><th>지역</th><th>적합도</th><th>처음 발견</th><th>링크</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="6" class="empty">아직 찾은 공고가 없습니다.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let rows = [], lastAt = null, maxQueries = 3, es = null;
+
+const list = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const join = (a) => (a || []).join(", ");
+const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + "%" : "");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const when = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso.replace(" ", "T"));
+  return isNaN(d) ? iso : d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+function msg(id, text, kind) { const el = $(id); el.textContent = text || ""; el.className = "msg" + (kind ? " " + kind : ""); }
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.reload(); throw new Error(j.error || "로그인이 필요합니다"); }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function fill(p) {
+  if (!p) return;
+  const c = p.candidate || {}, s = p.search || {};
+  $("headline").value = c.headline || ""; $("summary").value = c.summary || "";
+  $("years").value = c.years_experience ?? ""; $("seniority").value = c.seniority || "mid";
+  $("skills").value = join(c.skills); $("roles").value = join(c.target_roles);
+  $("locations").value = join(c.locations); $("languages").value = join(c.languages);
+  $("queries").value = join(s.queries); $("location").value = s.location || ""; $("remote").value = s.remote || "any";
+  fill.keep = { interests: c.interests || [], education: c.education || "" };
+}
+
+function read() {
+  const cand = {
+    headline: $("headline").value.trim(), summary: $("summary").value.trim(),
+    years_experience: parseFloat($("years").value) || 0, seniority: $("seniority").value,
+    skills: list($("skills").value), target_roles: list($("roles").value),
+    locations: list($("locations").value), languages: list($("languages").value),
+    ...(fill.keep || {}),
+  };
+  return { candidate: cand, search: { queries: list($("queries").value).slice(0, maxQueries),
+    location: $("location").value.trim(), remote: $("remote").value, posted: "week" } };
+}
+
+async function upload(file) {
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { msg("profile-msg", "PDF 파일만 올릴 수 있습니다.", "err"); return; }
+  msg("profile-msg", `${file.name}을(를) 읽는 중입니다. 1분 정도 걸릴 수 있습니다.`);
+  try {
+    const j = await api("/api/resume", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
+    fill(j.profile);
+    msg("profile-msg", "프로필을 채우고 저장했습니다. 내용을 확인하고 고칠 부분이 있으면 고친 뒤 다시 저장하세요.", "ok");
+  } catch (e) { msg("profile-msg", e.message, "err"); }
+}
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files[0]); });
+$("file").addEventListener("change", (e) => upload(e.target.files[0]));
+
+$("save").addEventListener("click", async () => {
+  const p = read();
+  if (!p.candidate.target_roles.length) { msg("profile-msg", "희망 직무를 하나 이상 입력해 주세요.", "err"); return; }
+  try { fill((await api("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) })).profile);
+        msg("profile-msg", "저장했습니다.", "ok"); }
+  catch (e) { msg("profile-msg", e.message, "err"); }
+});
+
+function showWatch(w) {
+  $("watch").checked = !!w.enabled;
+  $("next").textContent = w.running ? "지금 실행 중" : w.queued ? "곧 실행 (대기 중)" : when(w.next_run);
+  const last = w.last;
+  $("last").textContent = last ? when(last.at) : "없음";
+  $("last-result").innerHTML = last ? (last.error ? `<span style="color:var(--bad)">${esc(last.error)}</span>`
+    : `새 공고 <b>${last.new}</b> · 평가 <b>${last.scored}</b> · 잘 맞음 <b>${last.strong}</b>`
+      + (last.pending ? ` · 다음에 읽을 공고 <b>${last.pending}</b>` : "")) : "";
+  $("run-now").disabled = !!(w.running || w.queued);
+}
+
+$("watch").addEventListener("change", async (e) => {
+  try { showWatch(await api("/api/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) }));
+        msg("watch-msg", e.target.checked ? "자동 수집을 켰습니다. 첫 실행은 곧 시작됩니다." : "자동 수집을 껐습니다.", "ok"); }
+  catch (err) { e.target.checked = !e.target.checked; msg("watch-msg", err.message, "err"); }
+});
+$("run-now").addEventListener("click", async () => {
+  try { showWatch(await api("/api/run-now", { method: "POST" })); msg("watch-msg", "차례가 되면 바로 찾기 시작합니다. 몇 분 걸릴 수 있습니다.", "ok"); }
+  catch (e) { msg("watch-msg", e.message, "err"); }
+});
+
+function row(r) {
+  const hi = typeof r.fit === "number" && r.fit >= 0.7, fresh = lastAt && r.first_seen === lastAt;
+  const links = [`<a href="${esc(r.href)}" target="_blank" rel="noopener">LinkedIn</a>`];
+  if (r.apply_url) links.push(`<a href="${esc(r.apply_url)}" target="_blank" rel="noopener">회사 지원</a>`);
+  return `<tr class="${hi ? "fit-hi" : ""}${fresh ? " fresh" : ""}">
+    <td><div class="title">${esc(r.title)} ${fresh ? '<span class="tag new">새로</span>' : ""}</div><div class="dim">${esc(r.level || "")} ${esc(r.posted_text || "")}</div></td>
+    <td>${esc(r.company)}</td><td>${esc(r.location)}</td>
+    <td class="num"><strong>${pct(r.fit)}</strong></td>
+    <td class="num dim">${esc(when(r.first_seen))}</td><td>${links.join(" · ")}</td></tr>`;
+}
+function render() {
+  const q = $("filter").value.trim().toLowerCase(), onlyScored = $("only-scored").checked;
+  let shown = rows.filter((r) => (!onlyScored || typeof r.fit === "number")
+    && (!q || `${r.title} ${r.company} ${r.location}`.toLowerCase().includes(q)));
+  if (onlyScored) shown = shown.sort((a, b) => b.fit - a.fit);
+  $("rows").innerHTML = shown.length ? shown.map(row).join("")
+    : `<tr><td colspan="6" class="empty">${rows.length ? "조건에 맞는 공고가 없습니다." : "아직 찾은 공고가 없습니다. 프로필을 저장하고 자동 수집을 켜 보세요."}</td></tr>`;
+  $("export").disabled = !rows.length;
+}
+$("filter").addEventListener("input", render);
+$("only-scored").addEventListener("change", render);
+$("export").addEventListener("click", () => { location = "/api/export.xlsx"; });
+
+async function refresh() {
+  const [s, res] = await Promise.all([api("/api/state"), api("/api/results")]);
+  showWatch(s.watch);
+  rows = res.rows; lastAt = res.last_at;
+  $("count").textContent = res.total ? `전체 ${res.total}개 · 평가 ${res.scored}개${res.total > res.rows.length ? ` (최근 ${res.rows.length}개 표시)` : ""}` : "";
+  render();
+  return s;
+}
+
+function listen() {
+  es = new EventSource("/api/events");
+  es.addEventListener("status", (e) => { $("live").textContent = JSON.parse(e.data).msg; });
+  es.addEventListener("search", (e) => { $("live").textContent = `검색 중: ${JSON.parse(e.data).query}`; });
+  es.addEventListener("card", (e) => { const c = JSON.parse(e.data); $("live").textContent = `발견: ${c.title} · ${c.company}`; });
+  es.addEventListener("fit", () => { $("live").textContent = "공고를 읽고 적합도를 평가하는 중입니다"; });
+  es.addEventListener("cycle", (e) => {
+    const d = JSON.parse(e.data);
+    $("live").textContent = d.error ? "" : `완료: 새 공고 ${d.new}개, 평가 ${d.scored}개`;
+    refresh();
+  });
+}
+
+(async () => {
+  const s = await refresh();
+  $("who").textContent = `${s.user} 님`;
+  maxQueries = s.max_queries || 3;
+  $("mock-banner").hidden = s.jev;
+  if (s.profile) fill(s.profile); else msg("profile-msg", "먼저 이력서를 올리거나 프로필을 직접 입력해 주세요.");
+  if (!s.reader) { $("drop").style.display = "none"; msg("profile-msg", "지금은 이력서 자동 읽기를 쓸 수 없습니다. 프로필을 직접 입력해 주세요."); }
+  listen();
+})();
+</script>
+</body>
+</html>
