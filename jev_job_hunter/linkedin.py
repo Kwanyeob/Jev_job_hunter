@@ -34,10 +34,13 @@ GUEST_SEARCH = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/
 GUEST_POSTING = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{id}"
 POSTED = {"day": "r86400", "week": "r604800", "month": "r2592000", "any": ""}
 REMOTE = {"onsite": "1", "remote": "2", "hybrid": "3", "any": ""}
+# candidate.target_seniority → LinkedIn's "Experience level" filter (f_E)
+EXPERIENCE = {"intern": "1", "entry": "2", "associate": "3", "mid_senior": "4", "director": "5,6"}
 PAGE_SIZE = 10           # cards per guest search request
 AUTHWALL_LIMIT = 2       # consecutive login walls before the hunt stops
 RATE_LIMIT_RETRIES = 2   # 429s per request before giving up
 RATE_LIMIT_BACKOFF = 60.0  # seconds; doubles per retry, jittered
+REQUEST_LOG: Path | None = None  # when set, one JSON line per LinkedIn request (to tune the pacing)
 _AUTHWALL = re.compile(r"/(authwall|login|checkpoint|signup|uas/)", re.I)
 # Without Accept, LinkedIn answers 429 even to a first request (docs/evidence/2026-10-12-*).
 HEADERS = {
@@ -63,7 +66,8 @@ class Stopped(Exception):
     pass
 
 
-def search_params(query: str, location: str = "", posted: str = "week", remote: str = "any") -> dict:
+def search_params(query: str, location: str = "", posted: str = "week", remote: str = "any",
+                  experience=()) -> dict:
     params = {"keywords": query.strip()}
     if location:
         params["location"] = location.strip()
@@ -71,12 +75,16 @@ def search_params(query: str, location: str = "", posted: str = "week", remote: 
         params["f_TPR"] = POSTED[posted]
     if REMOTE.get(remote or "any"):
         params["f_WT"] = REMOTE[remote]
+    levels = sorted({n for e in experience or () for n in EXPERIENCE.get(e, "").split(",") if n})
+    if levels:
+        params["f_E"] = ",".join(levels)
     return params
 
 
-def search_url(query: str, location: str = "", posted: str = "week", remote: str = "any") -> str:
+def search_url(query: str, location: str = "", posted: str = "week", remote: str = "any",
+               experience=()) -> str:
     """The human-facing search page for the same query (shown in logs and the web UI)."""
-    return SEARCH_URL + "?" + urlencode(search_params(query, location, posted, remote))
+    return SEARCH_URL + "?" + urlencode(search_params(query, location, posted, remote, experience))
 
 
 def is_authwall(url: str) -> bool:
@@ -119,14 +127,17 @@ def parse_cards(page: str) -> list[dict]:
         chunk = page[a:b]
         href = re.search(r'href="([^"]*/jobs/view/[^"]*)"', chunk)
         posted = re.search(r'<time[^>]*datetime="([^"]*)"[^>]*>(.*?)</time>', chunk, re.S)
+        logo = re.search(r'data-delayed-url="([^"]*company-logo[^"]*)"', chunk)  # absent: LinkedIn's placeholder
         cards.append({
             "id": _CARD.match(chunk).group(1),
-            "href": html.unescape(href.group(1)).split("?")[0] if href else "",
+            "href": html.unescape(href.group(1)).split("?")[0] if href else
+                    f"https://www.linkedin.com/jobs/view/{_CARD.match(chunk).group(1)}",
             "title": _between(chunk, "base-search-card__title", "</h3>"),
             "company": _between(chunk, "base-search-card__subtitle", "</h4>"),
             "location": _between(chunk, "job-search-card__location", "</span>"),
             "posted": posted.group(1) if posted else "",
             "posted_text": " ".join(posted.group(2).split()) if posted else "",
+            "logo": html.unescape(logo.group(1)) if logo else "",
         })
     return [c for c in cards if c["title"]]
 
@@ -154,8 +165,10 @@ def parse_posting(page: str) -> dict:
         text = html_text(page[start:end if end > 0 else None])
     offsite = "offsite-apply-icon" in page or "apply-link-offsite" in page
     any_apply = "apply-button" in page or "public_jobs_apply" in page
+    logo = re.search(r'data-delayed-url="([^"]*company-logo[^"]*)"', page)
     return {"apply": apply, "criteria": criteria, "text": text,
-            "apply_type": "Company site" if offsite else "Easy Apply" if any_apply else ""}
+            "apply_type": "Company site" if offsite else "Easy Apply" if any_apply else "",
+            "logo": html.unescape(logo.group(1)) if logo else ""}
 
 
 def _noop(kind: str, data: dict) -> None:
@@ -202,13 +215,16 @@ class GuestClient:
         for attempt in range(RATE_LIMIT_RETRIES + 1):
             self._pace()
             self.requests += 1
+            t0 = time.monotonic()
             try:
                 r = self.http.get(url)
             except httpx.HTTPError as e:
                 self._last = time.monotonic()
+                _log_request(url, type(e).__name__, t0)
                 print(f"  HTTP error {type(e).__name__} for {url[:100]}", flush=True)
                 return ""
             self._last = time.monotonic()
+            _log_request(url, r.status_code, t0)
             if r.status_code in (429, 999):
                 if attempt == RATE_LIMIT_RETRIES:
                     raise RateLimited(f"HTTP {r.status_code} after {attempt + 1} tries")
@@ -230,14 +246,28 @@ class GuestClient:
         return (str(r.url), html_text(r.text)) if r.status_code == 200 else ("", "")
 
 
+def _log_request(url: str, status, t0: float) -> None:
+    if REQUEST_LOG is None:
+        return
+    kind = "search" if url.startswith(GUEST_SEARCH) else "posting" if "/jobPosting/" in url else "page"
+    line = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind, "status": status,
+            "ms": int((time.monotonic() - t0) * 1000)}
+    try:
+        REQUEST_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with REQUEST_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(line) + "\n")
+    except OSError:
+        pass  # the log is a measuring aid; never let it break a hunt
+
+
 def collect_cards(client: GuestClient, query: str, location: str, posted: str, remote: str,
                   limit: int, seen: set[str] | None = None, emit=_noop, stop=None,
-                  stop_at_seen: bool = False) -> list[dict]:
+                  stop_at_seen: bool = False, experience=()) -> list[dict]:
     """Cards for one search, 10 per request, deduped against `seen`. Each new card is emitted as read.
     With `stop_at_seen`, paging stops at the first page holding a job already in `seen`."""
     seen = set() if seen is None else seen
-    params = search_params(query, location, posted, remote)
-    url = search_url(query, location, posted, remote)
+    params = search_params(query, location, posted, remote, experience)
+    url = search_url(query, location, posted, remote, experience)
     board.print_li_search(query, url)
     emit("search", {"query": query, "url": url})
     new: list[dict] = []
@@ -253,7 +283,9 @@ def collect_cards(client: GuestClient, query: str, location: str, posted: str, r
         pages += 1
         reached_seen = any(c["id"] in seen for c in cards)
         for c in cards[:limit - total]:
-            if c["id"] not in seen:
+            if c["id"] in seen:
+                emit("seen", c)  # a job found before: lets the caller fill in details it lacked (logo)
+            else:
                 seen.add(c["id"])
                 card = {**c, "query": query}
                 new.append(card)
@@ -298,7 +330,7 @@ def read_posting(client: GuestClient, card: dict) -> dict:
     apply = apply_target(view.get("apply") or "")
     criteria = view.get("criteria") or {}
     extra = {"apply_type": view.get("apply_type") or "", "level": criteria.get("Seniority level", ""),
-             "employment": criteria.get("Employment type", "")}
+             "employment": criteria.get("Employment type", ""), "logo": view.get("logo") or ""}
     head = "\n".join(f"{k}: {v}" for k, v in criteria.items())
     li_text = (head + "\n\n" if head else "") + str(view.get("text") or "")
     if apply:
@@ -336,7 +368,7 @@ def save_results(out_dir: Path, matches: list[dict], listings: list[dict], meta:
 
 def search_queries(client: GuestClient, queries: list[str], location: str, posted: str, remote: str,
                    max_cards: int, seen: set[str], emit=_noop, stop=None,
-                   stop_at_seen: bool = False) -> list[dict]:
+                   stop_at_seen: bool = False, experience=()) -> list[dict]:
     """New cards across all queries. A block mid-way keeps what earlier queries found;
     it only raises when nothing was found at all."""
     found: list[dict] = []
@@ -345,7 +377,8 @@ def search_queries(client: GuestClient, queries: list[str], location: str, poste
         emit("status", {"msg": f"Searching LinkedIn: {q}"})
         try:
             found += collect_cards(client, q, location, posted, remote, max_cards,
-                                   seen=seen, emit=emit, stop=stop, stop_at_seen=stop_at_seen)
+                                   seen=seen, emit=emit, stop=stop, stop_at_seen=stop_at_seen,
+                                   experience=experience)
         except (AuthWall, RateLimited) as e:
             if not found:
                 raise
@@ -404,10 +437,11 @@ def read_cards(root: Path, cand: dict, picked: list[dict], client: GuestClient, 
         fit = scores.get("overall_fit", 0.0)
         m = {**c, **scores, "fit": fit, "source": post["source"], "apply_url": post["apply_url"],
              "read_url": post["url"], "apply_type": post.get("apply_type", ""),
-             "level": post.get("level", ""), "employment": post.get("employment", "")}
+             "level": post.get("level", ""), "employment": post.get("employment", ""),
+             "logo": c.get("logo") or post.get("logo", "")}
         matches.append(m)
         emit("fit", {"id": c["id"], **{k: m[k] for k in (*scores, "fit", "source", "apply_url", "read_url",
-                                                         "apply_type", "level", "employment")}})
+                                                         "apply_type", "level", "employment", "logo")}})
         board.print_li_fit(n, len(picked), c, post, scores, fit >= FIT_SAVE_THRESHOLD, ms)
         append_log(root, {"cmd": "linkedin", "stage": "fit", "url": post["url"], "jev_ms": ms,
                           "total_ms": int((time.perf_counter() - p0) * 1000),
@@ -445,7 +479,8 @@ def run_linkedin(root: Path, *, profile: dict | None = None, profile_path: str |
     stopped = ""
     try:
         listings = search_queries(client, queries, location, posted, remote, max_cards,
-                                  seen=set(), emit=emit, stop=stop)
+                                  seen=set(), emit=emit, stop=stop,
+                                  experience=cand.get("target_seniority") or ())
         if not listings:
             stopped = "no LinkedIn cards found"
         else:

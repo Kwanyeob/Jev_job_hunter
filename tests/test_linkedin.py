@@ -44,7 +44,9 @@ def card_html(c: dict) -> str:
             f'<h3 class="base-search-card__title">\n {c["title"]}\n</h3>'
             f'<h4 class="base-search-card__subtitle"><a href="#"> {c["company"]} </a></h4>'
             f'<span class="job-search-card__location"> {c["location"]} </span>'
-            f'<time class="job-search-card__listdate" datetime="{c["posted"]}">\n {c["posted_text"]}\n</time></div></li>')
+            f'<time class="job-search-card__listdate" datetime="{c["posted"]}">\n {c["posted_text"]}\n</time>'
+            + (f'<img class="artdeco-entity-image" data-delayed-url="{c["logo"]}">' if c.get("logo") else "")
+            + '</div></li>')
 
 
 def posting_html(text: str, apply: str = "") -> str:
@@ -145,6 +147,9 @@ def test_parse_real_guest_search_page():
     assert first["posted"] == "2026-10-09" and first["posted_text"] == "3 days ago"
     assert first["href"].startswith("https://kr.linkedin.com/jobs/view/") and "?" not in first["href"]
     assert all(c["id"] and c["title"] and c["company"] for c in cards)
+    assert first["logo"].startswith("https://media.licdn.com/") and "company-logo" in first["logo"]
+    assert "&amp;" not in first["logo"]
+    assert all(not c["logo"] or "company-logo" in c["logo"] for c in cards)  # never the grey placeholder
 
 
 def test_parse_real_guest_posting_page():
@@ -238,3 +243,20 @@ def test_requests_are_spaced_irregularly(monkeypatch):
     assert len(gaps) == 39  # none before the first request
     assert all(5.0 <= g <= 46.0 for g in gaps)  # 0.6–1.6 × delay, plus an occasional 1–3 × delay linger
     assert len(set(gaps)) == len(gaps) and max(gaps) - min(gaps) > 5.0  # never a fixed cadence
+
+
+def test_target_seniority_becomes_linkedins_experience_filter():
+    from urllib.parse import parse_qs, urlsplit
+    q = parse_qs(urlsplit(search_url("Java", "Toronto", "week", "any", ["mid_senior", "associate"])).query)
+    assert q["f_E"] == ["3,4"]
+    assert parse_qs(urlsplit(search_url("Java", experience=["director"])).query)["f_E"] == ["5,6"]
+    assert "f_E" not in search_url("Java") and "f_E" not in search_url("Java", experience=["bogus"])
+
+
+def test_profile_keeps_only_known_target_seniority():
+    from jev_job_hunter.profile import normalize_profile
+    prof = normalize_profile({"candidate": {"target_roles": ["Dev"],
+                                            "target_seniority": ["mid_senior", "ceo", "associate"]}}, "t")
+    assert prof["candidate"]["target_seniority"] == ["associate", "mid_senior"]
+    empty = normalize_profile({"candidate": {"target_roles": ["Dev"], "target_seniority": ["ceo"]}}, "t")
+    assert "target_seniority" not in empty["candidate"]

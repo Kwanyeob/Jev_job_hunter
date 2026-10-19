@@ -13,6 +13,8 @@ PII_KEYS = {
     "linkedin", "github", "website", "urls", "contact",
 }
 SEARCH_DEFAULTS = {"queries": [], "location": "", "remote": "any", "posted": "week"}
+# LinkedIn experience levels a candidate wants to apply at (candidate.target_seniority)
+TARGET_SENIORITY = ("intern", "entry", "associate", "mid_senior", "director")
 
 
 def load_profile(root: Path, path: str | None = None) -> dict:
@@ -38,6 +40,10 @@ def normalize_profile(data: dict, source: str) -> dict:
     for k in ("skills", "target_roles", "interests", "locations", "languages"):
         if k in cand:
             cand[k] = _strs(cand[k])
+    if "target_seniority" in cand:
+        cand["target_seniority"] = [s for s in TARGET_SENIORITY if s in _strs(cand["target_seniority"])]
+        if not cand["target_seniority"]:
+            del cand["target_seniority"]
     if not cand.get("target_roles"):
         raise SystemExit(f"ERROR: {source}: candidate.target_roles is empty")
     search = {**SEARCH_DEFAULTS, **{k: v for k, v in (data.get("search") or {}).items() if v is not None}}

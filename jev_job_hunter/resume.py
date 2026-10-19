@@ -25,6 +25,8 @@ PROFILE_SCHEMA = {
                 "summary": {"type": "string"},
                 "years_experience": {"type": "number"},
                 "seniority": {"type": "string", "enum": ["intern", "entry", "mid", "senior", "staff"]},
+                "target_seniority": {"type": "array", "items": {
+                    "type": "string", "enum": ["intern", "entry", "associate", "mid_senior", "director"]}},
                 "skills": _LIST,
                 "target_roles": _LIST,
                 "interests": _LIST,
@@ -32,7 +34,7 @@ PROFILE_SCHEMA = {
                 "languages": _LIST,
                 "education": {"type": "string"},
             },
-            "required": ["headline", "summary", "years_experience", "seniority", "skills",
+            "required": ["headline", "summary", "years_experience", "seniority", "target_seniority", "skills",
                          "target_roles", "interests", "locations", "languages", "education"],
             "additionalProperties": False,
         },
@@ -61,6 +63,9 @@ candidate:
 - years_experience: total professional experience in years (one decimal), computed from the
   work-history dates; count overlapping jobs once, ongoing roles up to today.
 - seniority: from years and scope of the most recent role.
+- target_seniority: 1-2 LinkedIn experience levels this person can apply at now
+  (intern, entry, associate, mid_senior, director); e.g. 3-6 years is usually
+  ["associate", "mid_senior"].
 - skills: concrete tools, languages, frameworks, methods the resume shows (max 20).
 - target_roles: 3-5 job titles as LinkedIn posts them that this person is qualified for now,
   in the same field as the resume (not only software).

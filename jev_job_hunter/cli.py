@@ -303,6 +303,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> None:
     ns = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
+    for stream in (sys.stdout, sys.stderr):  # a job title with "—" must not crash a cp949 console
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     root = load_env()
     {"start": cmd_start, "js": cmd_js, "step": cmd_step, "run": cmd_run,
      "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "watch": cmd_watch, "web": cmd_web,

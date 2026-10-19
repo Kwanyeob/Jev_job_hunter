@@ -204,3 +204,42 @@ def test_once_skips_quiet_hours(tmp_path, profile):
         watch.watch(ROOT, profile_path=str(profile), max_open=10, delay=0, mock=True, quiet=(1, 7), once=True,
                     client_factory=lambda: fake_client(site), clock=lambda: datetime(2026, 10, 14, 3, 0))
     assert "quiet hours" in buf.getvalue() and site.visited == []
+
+
+def test_each_find_is_saved_as_it_arrives_and_a_crash_keeps_them(tmp_path, profile, monkeypatch):
+    prof = load_profile(ROOT, str(profile))
+    key = watch_key(QUERIES, "South Korea", "day", "any")
+    on_disk = []
+
+    def boom(*a, **k):  # Jev fails after the search: the cards must already be on disk
+        on_disk.append(len(WatchState.load(tmp_path, key).listings))
+        raise RuntimeError("Jev unreachable")
+
+    monkeypatch.setattr(watch, "triage", boom)
+    got = _cycle(tmp_path, prof, FakeLinkedIn(), T0)
+    assert on_disk == [3] and got["new"] == 3 and "Jev unreachable" in got["error"]
+    saved = WatchState.load(tmp_path, key)
+    assert len(saved.listings) == 3 and set(saved.seen) == {"4001", "4002", "4003"}
+    assert all(c["query"] and c["first_seen"] == "2026-10-14 10:00" for c in saved.listings)
+
+
+def test_dismissed_jobs_are_not_read_from_the_queue(tmp_path, profile):
+    prof = load_profile(ROOT, str(profile))
+    first = _cycle_n(tmp_path, prof, FakeLinkedIn(), T0, max_open=1)
+    assert first["pending"] == 1
+    waiting = WatchState.load(tmp_path, watch_key(QUERIES, "South Korea", "day", "any")).pending[0]["id"]
+    watch.set_dismissed(tmp_path, [waiting])
+    site = FakeLinkedIn()
+    second = _cycle_n(tmp_path, prof, site, T0 + timedelta(minutes=40), max_open=1)
+    assert (second["scored"], second["pending"]) == (0, 0) and _postings_read(site) == 0
+
+
+def test_jobs_found_before_logos_get_one_when_seen_again(tmp_path, profile):
+    prof = load_profile(ROOT, str(profile))
+    _cycle(tmp_path, prof, FakeLinkedIn(), T0)  # cards without logos, like jobs saved before logos were kept
+    logo = "https://media.licdn.com/dms/image/v2/x/company-logo_100_100/toss_logo?e=1&v=beta"
+    site = FakeLinkedIn(cards=[{**CARDS[0], "logo": logo}, *CARDS[1:]])
+    again = _cycle(tmp_path, prof, site, T0 + timedelta(minutes=45))
+    assert again["new"] == 0 and _postings_read(site) == 0  # nothing extra fetched for it
+    saved = {c["id"]: c for c in WatchState.load(tmp_path, watch_key(QUERIES, "South Korea", "day", "any")).listings}
+    assert saved["4001"]["logo"] == logo and not saved["4002"].get("logo")

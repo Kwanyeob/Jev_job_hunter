@@ -109,7 +109,8 @@ def open_card_instructions(i: int, title: str, company: str) -> str:
 FIT_NOULS = {
     "role_match": "Given `candidate_profile` and `job`, does this role match the candidate's target roles?",
     "skills_match": "Given `candidate_profile` and `job`, does the candidate have most of the required skills and technologies?",
-    "seniority_match": "Given `candidate_profile` and `job`, does the required experience level match the candidate's years of experience and seniority?",
+    "seniority_match": ("Given `candidate_profile` and `job`, does the job's experience level fit the candidate: their "
+                        "years of experience and seniority, and the levels in `target_seniority` they want to apply at?"),
     "location_match": "Given `candidate_profile` and `job`, is the job location or remote policy compatible with the candidate's locations?",
     "overall_fit": "Given `candidate_profile` and `job`, should this candidate apply to this posting?",
 }

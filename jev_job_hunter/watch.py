@@ -77,7 +77,48 @@ class WatchState:
                                    "matches": self.matches, "cycles": self.cycles[-CYCLES_KEPT:],
                                    "pending": self.pending},
                                   indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-        os.replace(tmp, self.path)
+        _replace(tmp, self.path)
+
+
+def _replace(tmp: Path, path: Path) -> None:
+    """os.replace, retried briefly: on Windows it fails while the web server is reading the file."""
+    for attempt in range(20):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 19:
+                raise
+            time.sleep(0.05)
+
+
+def dismissed(root: Path) -> set[str]:
+    """Job IDs the user knocked out in the web UI. Kept apart from the watch state, which a running
+    cycle rewrites, so a knock-out made mid-cycle is never lost."""
+    path = root / "state" / "dismissed.json"
+    return set(json.loads(path.read_text(encoding="utf-8"))) if path.is_file() else set()
+
+
+def set_dismissed(root: Path, ids: list[str], on: bool = True) -> set[str]:
+    current = dismissed(root)
+    current = current | set(ids) if on else current - set(ids)
+    path = root / "state" / "dismissed.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(sorted(current)) + "\n", encoding="utf-8")
+    _replace(tmp, path)
+    return current
+
+
+def write_state_xlsx(root: Path, state: WatchState, meta: dict, new_ids: frozenset[str] = frozenset()) -> Path:
+    """The cumulative Excel: every match and listing the user hasn't knocked out."""
+    gone = dismissed(root)
+    return write_xlsx(state.xlsx,
+                      sorted((m for m in state.matches if m["id"] not in gone),
+                             key=lambda m: m.get("fit") or 0, reverse=True),
+                      sorted((c for c in state.listings if c["id"] not in gone),
+                             key=lambda c: c.get("open") or 0, reverse=True),
+                      meta, new_ids=new_ids)
 
 
 def in_quiet(t: datetime, quiet: tuple[int, int] | None) -> bool:
@@ -120,7 +161,8 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     """One poll: search page 1 per query (more only while every card is unseen), Jev-triage the new
     cards, then read + fit up to `max_open` of the best-rated jobs waiting (earlier cycles' leftovers
     and this cycle's). The rest wait in `state.pending` for the next cycle, which keeps each cycle's
-    LinkedIn reads few. Folds everything into the state and rewrites the cumulative Excel."""
+    LinkedIn reads few. Each card, triage and fit is saved the moment it arrives (the web UI shows
+    them live, and a crash keeps them); the cumulative Excel is rewritten at the end."""
     cand = prof["candidate"]
     own = client is None
     client = client or GuestClient(delay)
@@ -128,29 +170,62 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     stamp = started.strftime("%Y-%m-%d %H:%M")
     cards: list[dict] = []
     matches: list[dict] = []
-    queue = worth_reading(state.pending)
+    gone = dismissed(root)
+    queue = worth_reading([c for c in state.pending if c["id"] not in gone])
     to_read: list[dict] = []
     error, stopped = "", False
-    events = {"emit": emit} if emit else {}  # `emit(kind, data)` streams progress to the web UI
+
+    by_id = {c["id"]: c for c in state.listings}
+
+    def fill_logo(job_id: str, logo: str) -> bool:
+        listing = by_id.get(job_id)
+        if listing is None or listing.get("logo") or not logo:
+            return False
+        listing["logo"] = logo
+        return True
+
+    def record(kind: str, data: dict) -> None:
+        if kind == "seen":  # older jobs found before logos were kept get theirs here, at no extra request
+            if fill_logo(data["id"], data.get("logo") or ""):
+                state.save()
+            return
+        if kind == "card":  # the same dict collect_cards returns, so later triage scores land here too
+            data["first_seen"] = stamp
+            state.seen[data["id"]] = stamp
+            state.listings.append(data)
+            by_id[data["id"]] = data
+            state.save()
+        elif kind == "triage":
+            state.save()
+        elif kind == "fit":
+            state.matches.append(matches[-1])
+            if data["id"] in by_id:  # the job may have been listed in an earlier cycle
+                by_id[data["id"]]["opened"] = True
+            fill_logo(data["id"], data.get("logo") or "")
+            state.save()
+        if emit:  # `emit(kind, data)` streams progress to the web UI
+            emit(kind, data)
+
     try:
         cards = search_queries(client, queries, location, posted, remote, WATCH_MAX_PAGES * PAGE_SIZE,
-                               seen=set(state.seen), stop_at_seen=True, **events)
-        for c in cards:
-            c["first_seen"] = stamp
+                               seen=set(state.seen), stop_at_seen=True, emit=record,
+                               experience=cand.get("target_seniority") or ())
         if cards:
-            (emit or (lambda *a: None))("status", {"msg": f"Jev is triaging {len(cards)} titles"})
+            record("status", {"msg": f"Jev is triaging {len(cards)} titles"})
             jev_ms = triage(cand, " | ".join(queries), cards, mock)
             queue = worth_reading(queue + cards)
         to_read, queue = queue[:max_open], queue[max_open:]
         if cards or to_read:
-            report_triage(root, cards, to_read, jev_ms if cards else 0, **events)
-        read_cards(root, cand, to_read, client, matches, mock=mock, **events)
+            report_triage(root, cards, to_read, jev_ms if cards else 0, emit=record)
+        read_cards(root, cand, to_read, client, matches, mock=mock, emit=record)
     except AuthWall as e:
         error = f"LinkedIn login wall ({e})"
     except RateLimited as e:
         error = f"LinkedIn rate limit ({e})"
     except (Stopped, KeyboardInterrupt):
         error, stopped = "stopped", True
+    except Exception as e:  # e.g. Jev unreachable: keep what was found, report it, try again next cycle
+        error = f"{type(e).__name__}: {e}"
     finally:
         if own:
             client.close()
@@ -161,27 +236,18 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
     for c in unread:
         c["opened"] = False
     state.pending = worth_reading(unread + queue)[:PENDING_MAX]
-    for c in cards:
-        state.seen[c["id"]] = stamp
-    state.listings += cards
-    for c in state.listings:  # jobs read this cycle may have been listed in an earlier one
-        if c["id"] in read:
-            c["opened"] = True
-    state.matches += matches
 
     strong = sorted((m for m in matches if (m.get("fit") or 0) >= FIT_SAVE_THRESHOLD),
                     key=lambda m: m["fit"], reverse=True)
-    summary = {"at": stamp, "new": len(cards), "scored": len(matches), "strong": len(strong),
+    summary = {"at": stamp, "kind": "search" if queries else "read",
+               "new": len(cards), "scored": len(matches), "strong": len(strong),
                "requests": client.requests, "listings": len(state.listings), "matches": len(state.matches),
                "pending": len(state.pending), "error": error}
     state.cycles.append(summary)
     state.save()
     meta = {**hunt_meta(prof, queries, location, posted, remote, mock), "watch.state": str(state.path),
             "watch.cycles": len(state.cycles), "watch.last_run": stamp}
-    xlsx = write_xlsx(state.xlsx,
-                      sorted(state.matches, key=lambda m: m.get("fit") or 0, reverse=True),
-                      sorted(state.listings, key=lambda c: c.get("open") or 0, reverse=True),
-                      meta, new_ids=frozenset(c["id"] for c in cards))
+    xlsx = write_state_xlsx(root, state, meta, new_ids=frozenset(c["id"] for c in cards))
     append_log(root, {"cmd": "watch", "stage": "cycle", "links": len(cards),
                       "total_ms": int((clock() - started).total_seconds() * 1000),
                       "action": error or f"NEW {len(cards)}"})
