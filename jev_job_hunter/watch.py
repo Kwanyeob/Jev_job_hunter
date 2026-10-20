@@ -19,7 +19,7 @@ from jev_job_hunter import board
 from jev_job_hunter.excel import write_xlsx
 from jev_job_hunter.linkedin import (
     PAGE_SIZE, AuthWall, GuestClient, RateLimited, Stopped, hunt_meta, read_cards, report_triage,
-    search_queries, triage, worth_reading,
+    repost_key, search_queries, triage, worth_reading,
 )
 from jev_job_hunter.profile import load_profile
 from jev_job_hunter.questions import FIT_SAVE_THRESHOLD
@@ -52,6 +52,27 @@ class WatchState:
         self.matches: list[dict] = data.get("matches") or []
         self.cycles: list[dict] = data.get("cycles") or []
         self.pending: list[dict] = data.get("pending") or []  # worth reading, not read yet
+        self.drop_reposts()
+
+    def drop_reposts(self) -> None:
+        """Listings saved before reposts were caught: keep the first of each `repost_key`, and any
+        Jev already scored. Their IDs stay in `seen`, so they don't come back."""
+        scored = {m["id"] for m in self.matches}
+        keys: set[str] = set()
+        kept = []
+        for c in self.listings:
+            k = repost_key(c)
+            if c["id"] in scored or not k or k not in keys:
+                kept.append(c)
+            keys.add(k)
+        if len(kept) < len(self.listings):
+            ids = {c["id"] for c in kept}
+            self.listings = kept
+            self.pending = [c for c in self.pending if c["id"] in ids]
+
+    def known(self) -> set[str]:
+        """Everything a search should skip: job IDs seen, and the repost key of every listing."""
+        return set(self.seen) | {k for c in self.listings if (k := repost_key(c))}
 
     @classmethod
     def load(cls, root: Path, key: str) -> WatchState:
@@ -110,15 +131,19 @@ def set_dismissed(root: Path, ids: list[str], on: bool = True) -> set[str]:
     return current
 
 
-def write_state_xlsx(root: Path, state: WatchState, meta: dict, new_ids: frozenset[str] = frozenset()) -> Path:
-    """The cumulative Excel: every match and listing the user hasn't knocked out."""
+def write_state_xlsx(root: Path, state: WatchState, meta: dict, new_ids: frozenset[str] = frozenset(),
+                     scored_only: bool = False, listings_first: bool = False) -> Path:
+    """The cumulative Excel: every match and listing the user hasn't knocked out. Listings carry
+    Jev's fit where it has one and sort scored-first. `scored_only` leaves out the All listings sheet
+    and goes to a file of its own, so the full one stays whole."""
     gone = dismissed(root)
-    return write_xlsx(state.xlsx,
-                      sorted((m for m in state.matches if m["id"] not in gone),
-                             key=lambda m: m.get("fit") or 0, reverse=True),
-                      sorted((c for c in state.listings if c["id"] not in gone),
-                             key=lambda c: c.get("open") or 0, reverse=True),
-                      meta, new_ids=new_ids)
+    path = state.xlsx.with_stem(state.xlsx.stem + "-scored") if scored_only else state.xlsx
+    matches = sorted((m for m in state.matches if m["id"] not in gone), key=lambda m: m.get("fit") or 0, reverse=True)
+    fit = {m["id"]: m.get("fit") for m in matches}
+    listings = None if scored_only else sorted(
+        ({**c, "fit": fit.get(c["id"])} for c in state.listings if c["id"] not in gone),
+        key=lambda c: (c["fit"] is not None, c["fit"] or 0, c.get("open") or 0), reverse=True)
+    return write_xlsx(path, matches, listings, meta, new_ids=new_ids, listings_first=listings_first)
 
 
 def in_quiet(t: datetime, quiet: tuple[int, int] | None) -> bool:
@@ -208,7 +233,7 @@ def run_cycle(root: Path, state: WatchState, prof: dict, queries: list[str], loc
 
     try:
         cards = search_queries(client, queries, location, posted, remote, WATCH_MAX_PAGES * PAGE_SIZE,
-                               seen=set(state.seen), stop_at_seen=True, emit=record,
+                               seen=state.known(), stop_at_seen=True, emit=record,
                                experience=cand.get("target_seniority") or ())
         if cards:
             record("status", {"msg": f"Jev is triaging {len(cards)} titles"})

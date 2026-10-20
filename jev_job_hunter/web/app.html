@@ -77,6 +77,7 @@
   .tape-body { padding: 22px 28px 8px; }
   .tape-head { text-align: center; padding-bottom: 16px; }
   .tape-head h1 { margin: 0; font: 800 26px/1.1 var(--mono); letter-spacing: .14em; }
+  .demo-tag { display: inline-block; margin-top: 10px; padding: 4px 9px; border: 1.5px dashed var(--red); color: var(--red-ink); font: 700 12px/1 var(--mono); letter-spacing: .06em; }
   .tape-head p { margin: 6px 0 0; font: 500 12.5px/1.4 var(--mono); color: var(--muted); letter-spacing: .02em; }
   .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 14px 0; }
   .search { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid var(--rule); background: var(--field); border-radius: 3px; color: var(--muted); }
@@ -227,6 +228,14 @@
   .chips button { padding: calc(var(--fpad) - 1px) 9px; border-radius: 3px; border: 1px solid var(--rule); background: var(--field); color: var(--ink-2); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .chips button:hover { border-color: var(--ink); }
   .chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--tape); }
+  .pop.ex-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; border: 0; color: var(--ink); }
+  .ex-dialog::backdrop { background: rgba(15,15,14,.62); }
+  .ex-opts { display: grid; gap: 8px; margin-top: 14px; }
+  .ex-opt { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; text-align: left; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 3px; background: var(--field); color: var(--ink); cursor: pointer; font: inherit; }
+  .ex-opt:hover:not(:disabled) { border-color: var(--ink); }
+  .ex-opt b { font-size: 14.5px; } .ex-opt .n { font: 700 14px var(--mono); align-self: center; grid-row: span 2; }
+  .ex-opt small { color: var(--muted); font-size: 12.5px; }
+  .ex-opt:disabled { cursor: not-allowed; opacity: .5; }
   #profile-card .row { margin-top: auto; padding-top: calc(var(--gy) * 1.6); display: flex; align-items: center; gap: 14px; }
   #profile-card .row .msg { margin-top: 0; }
   .toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1.5px dashed var(--rule); cursor: pointer; }
@@ -278,8 +287,10 @@
   .pop h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.015em; }
   .pop p { margin: 0; color: var(--muted); font-size: 14px; }
   .pop-nav { display: flex; align-items: center; gap: 8px; margin-top: 16px; border-top: 1.5px dashed var(--rule); padding-top: 12px; }
-  .dots { display: flex; gap: 4px; margin-right: auto; }
-  .dots i { width: 6px; height: 6px; background: var(--rule); transition: all .2s; } .dots i.on { width: 18px; background: var(--ink); }
+  .step-n { margin-right: auto; font: 700 12.5px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .step-n b { color: var(--ink); }
+  .pop-nav > button { flex: none; white-space: nowrap; }
+  .pop-nav .link-btn { padding: 10px 4px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
 </head>
@@ -388,7 +399,7 @@
     <section class="tape" aria-labelledby="tape-title">
       <div class="tear" aria-hidden="true"></div>
       <div class="paper tape-body">
-        <div class="tape-head"><h1 id="tape-title">SHORTLIST</h1><p id="tape-sub"></p></div>
+        <div class="tape-head"><h1 id="tape-title">SHORTLIST</h1><p id="tape-sub"></p><span class="demo-tag" id="demo-tag" hidden data-i18n="demo_tag"></span></div>
         <hr class="perf">
         <div class="tools">
           <label class="search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr" data-i18n="filter_ph"></span><input type="text" id="filter" data-i18n-ph="filter_ph"></label>
@@ -413,7 +424,7 @@
         <div class="sub" id="rail-next-sub"></div>
         <div class="run" style="margin-top:14px"><span class="hint-wrap" id="rail-run-wrap"><button class="btn wide" id="rail-run"></button></span></div>
       </section>
-      <section class="paper slip">
+      <section class="paper slip" id="queue-slip">
         <h2 data-i18n="rail_queue"></h2>
         <div class="big" id="rail-queue">0<span style="font-size:18px;color:var(--muted)"> / 30</span></div>
         <div class="slots" id="rail-slots" aria-hidden="true"></div>
@@ -429,6 +440,15 @@
 <div id="tip" hidden role="tooltip"></div>
 <div id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" hidden data-i18n="undo"></button></div>
 
+<dialog class="pop ex-dialog" id="ex-dialog" aria-labelledby="ex-title">
+  <h3 id="ex-title" data-i18n="export"></h3>
+  <p data-i18n="ex_ask"></p>
+  <div class="ex-opts">
+    <button type="button" class="ex-opt" data-only="scored"><b data-i18n="ex_scored"></b><span class="n" id="ex-n-scored"></span><small data-i18n="ex_scored_sub"></small></button>
+    <button type="button" class="ex-opt" data-only="all"><b data-i18n="ex_all"></b><span class="n" id="ex-n-all"></span><small data-i18n="ex_all_sub"></small></button>
+  </div>
+  <div class="pop-nav"><button class="link-btn" id="ex-cancel" data-i18n="ex_cancel" style="margin-left:auto"></button></div>
+</dialog>
 <div id="tour" hidden>
   <div class="scrim"></div>
   <div class="hole" id="tour-hole"></div>
@@ -436,7 +456,7 @@
     <h3 id="tour-title"></h3>
     <p id="tour-body"></p>
     <div class="pop-nav">
-      <div class="dots" id="tour-dots"></div>
+      <span class="step-n" id="tour-step"></span>
       <button class="link-btn" id="tour-skip" data-i18n="tour_skip"></button>
       <button class="btn sm line-btn" id="tour-prev" data-i18n="tour_prev"></button>
       <button class="btn sm" id="tour-next"></button>
@@ -487,7 +507,7 @@ const STR = {
       <li><b>쉬는 시간</b> · 실행 사이에 몇 분씩 쉬고, 새벽 1~7시는 쉬어요.</li></ol>
       <p>간격과 쉬는 시간은 매번 <b>랜덤</b>이에요. LinkedIn은 요청이 짧은 시간에 몰리면 잠시 막기 때문에, 사람이 보는 것처럼 천천히 나눠서 가져와요. 막히면 알아서 더 오래 쉬었다가 이어서 해요.</p>
       <p>이 창을 닫아도 서버에서 계속 수집하고, 다시 들어오면 그동안 찾은 공고가 쌓여 있어요.</p>`,
-    filter_ph: "제목, 회사, 지역으로 거르기", q_all: "모든 검색어", export: "Excel 다운로드",
+    filter_ph: "제목, 회사, 지역으로 거르기", q_all: "모든 검색어", export: "Excel 다운로드", ex_ask: "어떤 공고를 받을까요?", ex_scored: "Jev가 평가한 공고만", ex_scored_sub: "적합도 점수가 있는 공고", ex_all: "모든 공고", ex_all_sub: "평가한 공고 + 찾은 공고 전체 시트", ex_cancel: "취소",
     undo: "되돌리기", tour_skip: "건너뛰기", tour_prev: "이전", tour_next: "다음", tour_done: "시작하기",
     rail_next: "다음 출력", rail_queue: "평가 대기열", rail_views: "보기",
     view_all: "전체", view_scored: "평가됨", view_strong: "잘 맞음", view_wait: "평가 예정",
@@ -531,18 +551,31 @@ const STR = {
     tour_main: [
       ["Shortlist에 오신 걸 환영해요", "이력서 한 장만 올리면 AI가 프로필을 만들고, Shortlist가 LinkedIn에서 맞는 공고를 알아서 찾아 목록에 출력해 둬요."],
       ["여기에 이력서를 놓으세요", "PDF를 끌어다 놓거나 눌러서 고르면 돼요. 읽는 동안 진행 막대가 움직이고, 다 읽으면 프로필이 나타나요. 이름·연락처는 저장하지 않아요."],
-      ["내 프로필", "AI가 채운 프로필은 이 탭에 있어요. 희망 직무와 검색어를 확인하고 고쳐서 저장하세요."],
+      ["내 프로필", "이력서를 올리면 이 탭에 프로필이 생겨요. 위에서부터 AI가 채운 경력·기술·희망 직무, 지원하고 싶은 연차, LinkedIn 검색어와 지역이 있고, 옆에는 자동 수집 스위치와 검색 간격, '지금 한 번 찾기' 버튼이 있어요. 고친 뒤 '프로필 저장'을 누르면 다음 검색부터 반영돼요. 이력서가 바뀌면 '이력서 다시 올리기'로 새로 채울 수 있어요."],
       ["찾은 공고", "검색할 때마다 새 공고가 영수증처럼 맨 위에 출력돼요. 점수에 마우스를 올리면 항목별 점수가, 필요 없는 공고는 ×로 지울 수 있어요."],
       ["언제든 다시 보기", "이 ? 버튼을 누르면 이 안내를 다시 볼 수 있어요. 옆에서 언어도 바꿀 수 있어요."],
     ],
     tour_profile: [
       ["AI가 채운 프로필이에요", "내용이 맞는지 확인하고, 고칠 부분은 고친 뒤 '프로필 저장'을 누르세요."],
-      ["희망 연차", "지원하고 싶은 연차를 고르세요. LinkedIn에서 그 연차 공고만 찾고, Jev도 이 기준으로 연차가 맞는지 평가해요. 아무것도 안 고르면 모든 연차를 찾아요."],
-      ["검색어와 지역", "LinkedIn에서 이 검색어(최대 3개)와 지역으로 공고를 찾아요. 찾은 공고마다 어떤 검색어로 찾았는지 표시돼요."],
+      ["이력서 다시 올리기", "이력서가 바뀌었다면 여기서 새 PDF를 올리세요. AI가 프로필을 처음부터 다시 채워서 바로 저장하니, 손으로 고친 내용은 새 이력서 기준으로 바뀌어요. 이미 찾은 공고와 점수는 그대로 남아요. 올리지 않고 나가려면 맨 위의 '← 내 프로필로 돌아가기'를 누르세요."],
       ["자동 수집 켜기", "켜 두면 정한 간격마다 LinkedIn에서 새 공고만 골라서 찾아요. 공고가 너무 많이 쌓이면 검색 간격을 늘려 보세요."],
       ["천천히, 랜덤 간격으로", "검색·평가 간격과 그 사이 쉬는 시간은 매번 랜덤이에요. LinkedIn은 요청이 몰리면 잠시 막아서, 사람처럼 나눠서 가져와요. 새벽 1~7시는 쉬고, 창을 닫아도 서버에서 계속 수집해요. 반짝이는 '수집은 어떻게 하나요?'를 지금 눌러서 펼쳐 보세요."],
       ["지금 바로 찾기", "기다리기 싫으면 눌러서 바로 한 번 찾아요. 찾는 동안 위에 진행 상황이 뜨고, '찾은 공고'에 한 줄씩 출력돼요."],
       ["찾은 공고", "결과는 이 탭에 쌓여요. 필요 없는 공고는 ×로 지우고, Excel로 내려받을 수도 있어요."],
+    ],
+    tour_reupload: [
+      ["새 이력서를 여기에 놓으세요", "PDF를 끌어다 놓거나 눌러서 고르면 AI가 프로필을 처음부터 다시 채우고 바로 저장해요. 손으로 고친 내용도 새 이력서 기준으로 바뀌어요. 이미 찾은 공고와 점수는 그대로 남아요."],
+      ["바꾸지 않고 돌아가기", "새로 올리지 않으려면 이 버튼을 누르세요. 지금 프로필 그대로 '내 프로필' 화면으로 돌아가요."],
+    ],
+    demo_tag: "예시 화면 · 안내가 끝나면 사라져요",
+    tour_to_results: [["이제 찾은 공고로", "프로필을 저장하고 자동 수집을 켜면, Shortlist가 이 내용으로 LinkedIn을 찾아서 '찾은 공고' 탭에 출력해요. 아직 찾은 공고가 없으니 예시 화면으로 어떻게 쌓이는지 보여 드릴게요."]],
+    tour_bridge: [["이제 내 프로필로", "찾은 공고는 모두 '내 프로필'에 적힌 직무·검색어·연차로 찾고 평가해요. '다음'을 누르면 내 프로필로 넘어가서 하나씩 보여 드릴게요."]],
+    tour_results: [
+      ["출력 한 묶음", "검색이 한 번 끝날 때마다 그때 찾은 새 공고가 날짜·시각과 함께 한 묶음으로 맨 위에 출력돼요. '새 공고 N'은 그 검색에서 처음 본 공고 수예요. 전에 본 공고나, 같은 회사가 같은 공고를 다시 올린 건 다시 출력하지 않아요. 가장 최근 묶음은 빨간 선으로 표시돼요."],
+      ["점수와 '평가 안 함'", "오른쪽 숫자가 Jev가 공고 본문을 읽고 매긴 적합도예요. 70% 이상이면 진하게 표시되고, 점수에 마우스를 올리면 직무·기술·연차·지역별 점수가 보여요. 점수 대신 '…쯤 평가'가 있으면 대기열에서 차례를 기다리는 중이고, '평가 안 함'은 Jev가 제목만 보고 맞지 않다고 봐서 읽지 않은 공고예요."],
+      ["평가 대기열", "Jev가 제목만 보고 '읽어볼 만하다'고 고른 공고가 여기서 차례를 기다려요. 최대 30개까지, 점수 높은 순으로 줄을 서요. 약 8~14분마다 5개씩 본문을 읽고 적합도를 매겨요. LinkedIn은 공고를 한꺼번에 많이 열면 막기 때문에 나눠서 읽어요. 30개가 넘으면 점수가 가장 낮은 공고부터 밀려나요."],
+      ["골라 보기", "전체 · 평가됨 · 잘 맞음(70% 이상) · 평가 예정으로 나눠 볼 수 있어요. 위 칸에 회사나 지역을 입력해 거르거나, 검색어별로 볼 수도 있어요."],
+      ["Excel로 받기", "누르면 창이 떠요. Jev가 평가한 공고만 받을지, 찾은 공고 전부를 받을지 고르세요. 전부 받으면 첫 시트에 모든 공고가 적합도 높은 순으로 들어 있어요."],
     ],
   },
   en: {
@@ -575,7 +608,7 @@ const STR = {
       <li><b>Rest</b> · It rests a few minutes between runs and pauses from 1 to 7 a.m.</li></ol>
       <p>Intervals and rests are <b>random</b> every time. LinkedIn briefly blocks bursts of requests, so jobs are fetched slowly, the way a person would browse. If it gets blocked, it rests longer and carries on.</p>
       <p>It keeps collecting on the server after you close this page; your jobs will be waiting when you come back.</p>`,
-    filter_ph: "Filter by title, company, location", q_all: "All search terms", export: "Download Excel",
+    filter_ph: "Filter by title, company, location", q_all: "All search terms", export: "Download Excel", ex_ask: "Which jobs do you want?", ex_scored: "Only jobs Jev scored", ex_scored_sub: "Jobs with a fit score", ex_all: "All jobs", ex_all_sub: "Scored jobs + a sheet of every job found", ex_cancel: "Cancel",
     undo: "Undo", tour_skip: "Skip", tour_prev: "Back", tour_next: "Next", tour_done: "Get started",
     rail_next: "Next print", rail_queue: "Scoring queue", rail_views: "View",
     view_all: "All", view_scored: "Scored", view_strong: "Strong fit", view_wait: "To score",
@@ -619,18 +652,31 @@ const STR = {
     tour_main: [
       ["Welcome to Shortlist", "Upload your resume once. AI builds your profile, and Shortlist keeps finding matching LinkedIn jobs and printing them to your list."],
       ["Drop your resume here", "Drag a PDF here or click to choose one. A bar shows progress while it's read, then your profile appears. Your name and contact details are never stored."],
-      ["My profile", "The profile AI filled in lives in this tab. Check the target roles and search terms, fix them, and save."],
+      ["My profile", "Your profile appears in this tab once you upload a resume. From the top: the experience, skills and target roles AI filled in, the levels you want to apply at, and the LinkedIn search terms and location. Beside it are the auto-search switch, the search interval and 'Search now'. Edit, press 'Save profile', and the next search uses it. If your resume changes, 'Upload a new resume' fills it in again."],
       ["Jobs found", "Every search prints its new jobs at the top, like a receipt. Hover a score for its breakdown, and remove any job you don't want with ×."],
       ["See this again anytime", "Press this ? button to see the guide again. You can switch the language right next to it."],
     ],
     tour_profile: [
       ["Your AI-filled profile", "Check that it's right, fix anything that's off, then press 'Save profile'."],
-      ["Target level", "Pick the levels you want to apply at. LinkedIn only returns jobs at those levels, and Jev judges seniority against them. Pick none to see every level."],
-      ["Search terms and location", "LinkedIn is searched with these terms (up to 3) and this location. Every job shows which term found it."],
+      ["Upload a new resume", "If your resume changed, upload the new PDF here. AI fills the profile in again from scratch and saves it right away, so edits you made by hand follow the new resume. Jobs and scores you already have stay. To leave without uploading, press '← Back to my profile' at the top."],
       ["Turn on auto search", "While it's on, new jobs are found on your chosen interval. If too many pile up, pick a longer interval."],
       ["Slow, random timing", "Search and scoring intervals and the rests between them are random each time. LinkedIn blocks bursts, so jobs are fetched slowly, like a person browsing. It pauses 1–7 a.m. and keeps running on the server after you close this page. Click the glowing 'How does it collect jobs?' to open it now."],
       ["Search right now", "Don't want to wait? Press this to search once now. Progress shows at the top and jobs print to 'Jobs found' line by line."],
       ["Jobs found", "Results collect in this tab. Remove the ones you don't want with ×, or download them as Excel."],
+    ],
+    tour_reupload: [
+      ["Drop the new resume here", "Drag a PDF here or click to choose one. AI fills the profile in again from scratch and saves it right away, so edits you made by hand follow the new resume. Jobs and scores you already have stay."],
+      ["Go back without changing", "Not uploading after all? Press this to return to 'My profile' with your profile as it is."],
+    ],
+    demo_tag: "Sample · gone when the guide ends",
+    tour_to_results: [["On to Jobs found", "Save the profile and turn on auto search, and Shortlist searches LinkedIn with it and prints what it finds in 'Jobs found'. You have no jobs yet, so here is a sample of how they pile up."]],
+    tour_bridge: [["On to My profile", "Every job here is found and scored from what 'My profile' says: roles, search terms, levels. Press Next to go to My profile and walk through it."]],
+    tour_results: [
+      ["One printout", "Each finished search prints the new jobs it found as one block at the top, stamped with the date and time. 'N new' counts jobs that search saw for the first time. Jobs seen before, and the same job reposted by the same company, are not printed again. The latest block is marked in red."],
+      ["Scores and 'Not scored'", "The number on the right is the fit Jev gave after reading the posting. 70% and up is shown dark; hover a score for its role, skills, level and location parts. 'Scored ~time' means it is waiting in the queue, and 'Not scored' means Jev judged from the title alone that it doesn't fit, so it wasn't read."],
+      ["Scoring queue", "Jobs Jev picked from their titles as worth reading wait here for their turn: up to 30, best first. About every 8–14 minutes, 5 of them are read and scored. LinkedIn blocks opening many postings at once, so they are read a few at a time. Past 30, the lowest-rated job drops off."],
+      ["Narrow the list", "Switch between All · Scored · Strong fit (70%+) · To score. Type a company or place in the box above to filter, or pick one search term."],
+      ["Download as Excel", "This opens a window: download only the jobs Jev scored, or every job found. 'All jobs' puts every job on the first sheet, best fit first."],
     ],
   },
 };
@@ -711,10 +757,12 @@ async function api(path, opts = {}) {
 const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 /* ---------- tabs ---------- */
-function showTab(name) {
+function showTab(name, quiet = false) {
   for (const tb of document.querySelectorAll(".tab")) tb.setAttribute("aria-selected", String(tb.dataset.tab === name));
   $("view-profile").hidden = name !== "profile";
   $("view-results").hidden = name !== "results";
+  if (!quiet && name === "results" && rows.length && $("tour").hidden && !store.get("jjh.tour.full"))
+    setTimeout(() => startTour("full", "jjh.tour.full"), 350);  // first visit with jobs on the tape
 }
 for (const tb of document.querySelectorAll(".tab")) tb.addEventListener("click", () => showTab(tb.dataset.tab));
 
@@ -725,6 +773,8 @@ function showOnboard(reupload = false) {
   document.querySelector(".slot .tear").hidden = !reader;
   $("manual").hidden = reupload; $("cancel-reupload").hidden = !reupload;
   msg("drop-msg", reader ? "" : t("no_reader"));
+  if (reupload && $("tour").hidden && !store.get("jjh.tour.reupload"))
+    setTimeout(() => startTour("reupload", "jjh.tour.reupload"), 350);  // first time on this screen
 }
 function showProfile() {
   $("onboard").hidden = true; $("profile-area").hidden = false;
@@ -797,7 +847,7 @@ async function upload(file) {
     await new Promise((r) => setTimeout(r, 600));
     fill(j.profile); hasProfile = true; showProfile();
     msg("profile-msg", t("filled"), "ok");
-    if (!reupload && !store.get("jjh.tour.profile")) setTimeout(() => startTour("profile", "jjh.tour.profile"), 450);
+    if (!reupload && !store.get("jjh.tour.profile")) setTimeout(() => startTour("fresh", ["jjh.tour.profile", "jjh.tour.full"]), 450);
   } catch (e) {
     bar.fail(); showOnboard(reupload); msg("drop-msg", e.message, "err");
   }
@@ -831,6 +881,13 @@ function paintRun(btn, wrap, w) {  // "search now" lives in two places: the prof
   const hint = w.running ? t("hint_running") : w.queued ? t("hint_queued") : until ? t("hint_wait", { t: until }) : "";
   if (hint) wrap.dataset.hint = hint; else delete wrap.dataset.hint;
 }
+function paintQueue(n, nextRead) {
+  const pending = Math.min(n, QUEUE_CAP);
+  $("ms-queue").textContent = String(pending);
+  $("rail-queue").firstChild.textContent = String(pending);
+  $("rail-slots").innerHTML = Array.from({ length: QUEUE_CAP }, (_, i) => `<i class="${i < pending ? "on" : ""}"></i>`).join("");
+  $("rail-queue-sub").textContent = pending ? t("rail_queue_sub", { t: nextRead ? clock(nextRead) : "--:--" }) : t("rail_queue_idle");
+}
 function showWatch(w) {
   watchState = w;
   $("watch").checked = !!w.enabled;
@@ -848,16 +905,12 @@ function showWatch(w) {
   $("ms-run").title = $("rail-run-wrap").dataset.hint || "";
   $("ms-next").textContent = w.running ? "··:··" : w.enabled || w.queued ? clock(w.next_run) : "--:--";
   $("ms-next-l").textContent = w.enabled || w.running ? t("ms_next") : t("live_off");
-  $("ms-queue").textContent = String(Math.min(w.pending || 0, QUEUE_CAP));
   // top bar and rail
   $("live-top").classList.toggle("off", !w.enabled && !w.running);
   $("live-top-text").textContent = w.running ? t("live_run") : w.enabled ? t("live_on", { t: clock(w.next_run) }) : t("live_off");
   $("rail-next").textContent = w.running ? "··:··" : w.enabled || w.queued ? clock(w.next_run) : "--:--";
   $("rail-next-sub").textContent = w.enabled ? t("rail_every", { every: everyText(w.every) }) : t("rail_off");
-  const pending = Math.min(w.pending || 0, QUEUE_CAP);
-  $("rail-queue").firstChild.textContent = String(pending);
-  $("rail-slots").innerHTML = Array.from({ length: QUEUE_CAP }, (_, i) => `<i class="${i < pending ? "on" : ""}"></i>`).join("");
-  $("rail-queue-sub").textContent = pending ? t("rail_queue_sub", { t: w.next_read ? clock(w.next_read) : "--:--" }) : t("rail_queue_idle");
+  if (!demo.on) paintQueue(w.pending || 0, w.next_read);
   clearTimeout(showWatch.t);
   if (w.run_now_at) showWatch.t = setTimeout(refresh, Math.max(1000, new Date(w.run_now_at) - Date.now() + 1500));
   if (w.running) setRunning(true);
@@ -973,7 +1026,9 @@ function render() {
   for (const r of rows) knownIds.add(r.id);
   line.seeded = true;
   const scored = rows.filter(isScored).length, strong = rows.filter(VIEWS.strong).length;
+  $("ex-n-scored").textContent = scored; $("ex-n-all").textContent = rows.length;
   $("export").disabled = !rows.length;
+  document.querySelector('.ex-opt[data-only="scored"]').disabled = !scored;
   $("badge").textContent = rows.length || "";
   $("vc-all").textContent = rows.length; $("vc-scored").textContent = scored;
   $("vc-strong").textContent = strong; $("vc-wait").textContent = rows.filter(VIEWS.wait).length;
@@ -993,7 +1048,16 @@ $("views").addEventListener("click", (e) => {
   for (const v of $("views").children) v.setAttribute("aria-pressed", String(v === b));
   render();
 });
-$("export").addEventListener("click", () => { location = "/api/export.xlsx"; });
+$("export").addEventListener("click", () => $("ex-dialog").showModal());
+$("ex-cancel").addEventListener("click", () => $("ex-dialog").close());
+$("ex-dialog").addEventListener("click", e => {
+  const r = $("ex-dialog").getBoundingClientRect();
+  if (e.target === $("ex-dialog") && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) return $("ex-dialog").close();  // the backdrop
+  const b = e.target.closest("[data-only]");
+  if (!b) return;
+  $("ex-dialog").close();
+  location = "/api/export.xlsx" + (b.dataset.only === "scored" ? "?only=scored" : "");
+});
 
 let toastTimer = null;
 function toast(text, undo) {
@@ -1016,8 +1080,43 @@ $("rows").addEventListener("click", async (e) => {
 
 async function refreshResults() {
   const res = await api("/api/results");
+  if (demo.on) { demo.rows = res.rows; demo.total = res.total; return; }  // shown once the sample goes away
   rows = res.rows; render.total = res.total;
   render();
+}
+
+/* sample rows for the guide when there are no jobs yet; only drawn, never saved */
+const demo = { on: false, rows: [], total: undefined };
+function startDemo() {
+  if (demo.on) return;
+  Object.assign(demo, { on: true, rows, total: render.total });
+  const q = (list($("queries").value)[0] || "Software Engineer").replace(/\b\w/g, (c) => c.toUpperCase());
+  const place = $("location").value.trim() || "Seoul, South Korea";
+  const ago = (min) => { const d = new Date(Date.now() - min * 60000), z = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+  const now = ago(8), before = ago(64), soon = ago(-12);
+  const job = (id, title, company, at, extra) => ({ id: "demo-" + id, title, company, location: place, query: q,
+    first_seen: at, posted_text: at === now ? "1 hour ago" : "3 hours ago", ...extra });
+  const fit = (f, r, sk, se, l) => ({ fit: f, role_match: r, skills_match: sk, seniority_match: se, location_match: l, source: "LinkedIn" });
+  rows = [
+    job(1, "Senior " + q, "Northwind Labs", now, fit(0.86, 0.92, 0.84, 0.78, 0.9)),
+    job(2, q, "Contoso", now, { eval: { state: "queued", at: soon } }),
+    job(3, q + " Intern", "Fabrikam", now, { eval: { state: "skipped" } }),
+    job(4, q + " II", "Tailspin", before, fit(0.64, 0.8, 0.6, 0.55, 0.7)),
+    job(5, "Lead " + q, "Adatum", before, fit(0.47, 0.6, 0.5, 0.25, 0.7)),
+  ];
+  render.total = undefined;
+  render();
+  paintQueue(12, soon);
+  $("demo-tag").hidden = false;
+}
+function endDemo() {
+  if (!demo.on) return;
+  demo.on = false;
+  rows = demo.rows; render.total = demo.total;
+  $("demo-tag").hidden = true;
+  render();
+  if (watchState) showWatch(watchState);
 }
 let soon = null;
 const refreshSoon = () => { clearTimeout(soon); soon = setTimeout(refreshResults, 700); };
@@ -1056,22 +1155,47 @@ function listen() {
 }
 
 /* ---------- guided tour ---------- */
-// steps point at elements; the words come from STR[LANG].tour_main / tour_profile, in the same order
+// steps point at elements; the words come from STR[LANG][KEY_OF[name]], in the same order. A step with a
+// tab switches to it, so one guide can walk the results first and then the profile.
 const TOUR_SEL = {
   main: [null, "#drop", "#tab-profile", "#tab-results", "#help"],
-  profile: ["#profile-card", "#target-sen-field", "#search-fields", "#watch-toggle", "#how-collect", "#run-now", "#tab-results"],
+  profile: ["#profile-card", "#reupload", "#watch-toggle", "#how-collect", "#run-now", "#tab-results"],
+  reupload: ["#drop", "#cancel-reupload"],
+  results: ["#rows .cut", "#rows .score", "#queue-slip, #mstrip", "#views", "#export"],
 };
+const KEY_OF = { main: "tour_main", profile: "tour_profile", reupload: "tour_reupload", results: "tour_results",
+                 bridge: "tour_bridge", to_results: "tour_to_results" };
+const TOUR_TAB = { profile: "profile", reupload: "profile", results: "results" };
+const currentTab = () => ($("view-results").hidden ? "profile" : "results");
+const find = (sel) => sel && [...document.querySelectorAll(sel)].find(visible);  // the first match on screen (desktop rail or phone strip)
 const CLICK_STEP = "#how-collect";
 const tour = { steps: [], i: 0, key: null };
 const visible = (el) => el && el.offsetParent !== null && el.getClientRects().length;
 function tourSteps(which) {
-  const pick = (name, i) => ({ sel: TOUR_SEL[name][i], name, i });
+  const pick = (name, i, tab = TOUR_TAB[name]) => ({ sel: TOUR_SEL[name][i], name, i, tab });
   if (which === "main") return TOUR_SEL.main.map((_, i) => pick("main", i)).slice(1);  // the screen itself is the welcome
-  if (which === "profile") return TOUR_SEL.profile.map((_, i) => pick("profile", i));
-  return [...TOUR_SEL.profile.map((_, i) => pick("profile", i)), pick("main", 4)];  // "both"
+  // with no jobs yet, the results steps run over sample rows (see startDemo)
+  const results = () => TOUR_SEL.results.map((_, i) => ({ ...pick("results", i), demo: !rows.length }));
+  if (which === "fresh") return [  // right after the first resume: the profile, then how jobs will arrive
+    ...TOUR_SEL.profile.slice(0, -1).map((_, i) => pick("profile", i)),
+    { sel: "#tab-results", name: "to_results", i: 0, tab: "profile" },
+    ...results(),
+    { ...pick("main", 4, "results"), demo: !rows.length },  // the sample stays up to the last card
+  ];
+  if (which !== "full") return TOUR_SEL[which].map((_, i) => pick(which, i));
+  return [  // jobs found first, then over to the profile that finds them; its last step ("go see your jobs") is moot here
+    ...results(),
+    { sel: "#tab-profile", name: "bridge", i: 0, tab: "results" },
+    ...TOUR_SEL.profile.slice(0, -1).map((_, i) => pick("profile", i)),
+    pick("main", 4, "profile"),
+  ];
 }
 function startTour(which, key) {
-  tour.steps = tourSteps(which).filter((s) => !s.sel || visible(document.querySelector(s.sel)));
+  if (!$("tour").hidden) return;  // already running (the first visit can ask twice)
+  const was = currentTab(), all = tourSteps(which);
+  if (all.some((s) => s.demo)) startDemo();  // so the sample rows count as on screen
+  tour.steps = all.filter((s) => { if (s.tab) showTab(s.tab, true); return !s.sel || find(s.sel); });
+  endDemo(); showTab(was, true);
   if (!tour.steps.length) return;
   tour.i = 0; tour.key = key;
   $("tour").hidden = false;
@@ -1081,13 +1205,16 @@ function startTour(which, key) {
 function endTour() {
   $("tour").hidden = true;
   document.documentElement.classList.remove("locked");
-  if (tour.key) store.set(tour.key, "1");
+  endDemo();
+  for (const k of [].concat(tour.key || [])) store.set(k, "1");
 }
 function drawTour() {
   const s = tour.steps[tour.i], n = tour.steps.length;
-  const [title, body] = t(s.name === "main" ? "tour_main" : "tour_profile")[s.i];
+  if (s.demo) startDemo(); else endDemo();
+  if (s.tab && s.tab !== currentTab()) { showTab(s.tab, true); scrollTo(0, 0); }
+  const [title, body] = t(KEY_OF[s.name])[s.i];
   $("tour-title").textContent = title; $("tour-body").textContent = body;
-  $("tour-dots").innerHTML = tour.steps.map((_, k) => `<i class="${k === tour.i ? "on" : ""}"></i>`).join("");
+  $("tour-step").innerHTML = `<b>${tour.i + 1}</b> / ${n}`;
   $("tour-prev").hidden = tour.i === 0;
   $("tour-next").textContent = tour.i === n - 1 ? t("tour_done") : t("tour_next");
   $("tour-skip").hidden = tour.i === n - 1;
@@ -1099,7 +1226,7 @@ function drawTour() {
 function placeTour(bringIntoView = false) {
   if ($("tour").hidden) return;
   const s = tour.steps[tour.i], hole = $("tour-hole"), pop = $("tour-pop");
-  const el = s.sel && document.querySelector(s.sel);
+  const el = find(s.sel);
   const vw = innerWidth, vh = innerHeight, pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 14, m = 12, pad = 8;
   if (!el) {  // centered intro card over a dimmed page
     $("tour").classList.remove("spot"); hole.hidden = true;
@@ -1113,8 +1240,9 @@ function placeTour(bringIntoView = false) {
     el.scrollIntoView({ block: r.height > vh - headH - ph ? "start" : "center" });
     r = el.getBoundingClientRect();
   }
-  // the visible part of the target, below the sticky header
-  let top = Math.max(r.top - pad, headH + 6), bottom = Math.min(r.bottom + pad, vh - 6);
+  // the visible part of the target, below the sticky header (unless the target is in the header)
+  const floor = el.closest(".top") ? 0 : headH + 6;
+  let top = Math.max(r.top - pad, floor), bottom = Math.min(r.bottom + pad, vh - 6);
   const left = r.left - pad, right = r.right + pad;
   // the card goes beside the highlight, never on it: below, above, right, left; if nothing fits
   // (a target taller than the screen), the highlight is trimmed to leave room underneath
@@ -1156,7 +1284,8 @@ addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") $("tour-prev").click();
 });
 $("help").addEventListener("click", () => {
-  if (!$("view-profile").hidden && hasProfile && !$("profile-area").hidden) startTour("profile", null);
+  if (!$("view-profile").hidden && hasProfile && !$("cancel-reupload").hidden) return startTour("reupload", null);
+  if (hasProfile) startTour("full", null);
   else { showTab("profile"); startTour("main", null); }
 });
 
@@ -1172,9 +1301,11 @@ $("help").addEventListener("click", () => {
   if (hasProfile) { fill(s.profile); showProfile(); showTab("results"); } else { showOnboard(); showTab("profile"); }
   applyLang();
   listen();
-  if (!store.get("jjh.tour.main")) {
-    if (hasProfile) store.set("jjh.tour.profile", "1");  // the main tour already covers the profile
-    setTimeout(() => { if (hasProfile) showTab("profile"); startTour(hasProfile ? "both" : "main", "jjh.tour.main"); }, 350);
+  if (hasProfile && !store.get("jjh.tour.full")) {
+    store.set("jjh.tour.profile", "1");  // the full guide covers the profile too
+    setTimeout(() => startTour("full", "jjh.tour.full"), 350);
+  } else if (!hasProfile && !store.get("jjh.tour.main")) {
+    setTimeout(() => startTour("main", "jjh.tour.main"), 350);
   }
 })();
 </script>

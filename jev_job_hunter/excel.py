@@ -26,7 +26,7 @@ MATCH_COLS = (
     ("Apply / ATS", 16, "apply_url"), ("LinkedIn", 12, "href"), ("Job ID", 14, "id"), ("Query", 20, "query"),
 )
 LIST_COLS = (
-    ("Open score", 11, "open"), ("Opened", 8, "opened"), ("Title", 42, "title"),
+    ("Overall fit", 11, "fit"), ("Open score", 11, "open"), ("Opened", 8, "opened"), ("Title", 42, "title"),
     ("Company", 22, "company"), ("Location", 22, "location"), ("Posted", 12, "posted"),
     ("Updated", 14, "posted_text"), ("First seen", 16, "first_seen"), ("LinkedIn", 12, "href"),
     ("Job ID", 14, "id"), ("Query", 20, "query"),
@@ -71,8 +71,8 @@ def _scale(ws, col: int, last: int) -> None:
         end_type="num", end_value=1, end_color="86EFAC"))
 
 
-def write_xlsx(path: Path, matches: list[dict], listings: list[dict], meta: dict,
-               new_ids: frozenset[str] = frozenset()) -> Path:
+def write_xlsx(path: Path, matches: list[dict], listings: list[dict] | None, meta: dict,
+               new_ids: frozenset[str] = frozenset(), listings_first: bool = False) -> Path:
     wb = Workbook()
     ws = wb.active
     ws.title = "Matches"
@@ -85,13 +85,17 @@ def write_xlsx(path: Path, matches: list[dict], listings: list[dict], meta: dict
     _scale(ws, 2, len(matches) + 1)
     ws.auto_filter.ref = f"A1:{get_column_letter(len(MATCH_COLS))}{max(1, len(matches) + 1)}"
 
-    wl = wb.create_sheet("All listings")
-    _header(wl, LIST_COLS)
-    for i, rec in enumerate(listings, 2):
-        _row(wl, i, LIST_COLS, rec, bold=rec.get("id") in new_ids)
-    _scale(wl, 1, len(listings) + 1)
-    wl.auto_filter.ref = f"A1:{get_column_letter(len(LIST_COLS))}{max(1, len(listings) + 1)}"
+    if listings is not None:  # None: Jev's matches only
+        wl = wb.create_sheet("All listings", 0 if listings_first else None)
+        _header(wl, LIST_COLS)
+        for i, rec in enumerate(listings, 2):
+            _row(wl, i, LIST_COLS, rec, bold=rec.get("id") in new_ids)
+        _scale(wl, 1, len(listings) + 1)
+        wl.auto_filter.ref = f"A1:{get_column_letter(len(LIST_COLS))}{max(1, len(listings) + 1)}"
 
+    for i, sheet in enumerate(wb):  # the file opens on the first sheet, and only that one is selected
+        sheet.sheet_view.tabSelected = i == 0
+    wb.active = 0
     wp = wb.create_sheet("Profile")
     wp.column_dimensions["A"].width, wp.column_dimensions["B"].width = 20, 90
     for r, (k, v) in enumerate(meta.items(), 1):

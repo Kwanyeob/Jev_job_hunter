@@ -220,8 +220,10 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
         search = (_load_saved(root) or {}).get("search") or {}
         meta = {"user": user.name, "exported": date.today().isoformat(),
                 "queries": search.get("queries") or [], "location": search.get("location") or ""}
-        path = write_state_xlsx(root, st, meta)  # fresh, so knocked-out jobs are left out
-        return FileResponse(path, filename=f"shortlist-{date.today().isoformat()}.xlsx")
+        scored_only = request.query_params.get("only") == "scored"  # Jev's matches, no All listings sheet
+        path = write_state_xlsx(root, st, meta, scored_only=scored_only, listings_first=not scored_only)  # fresh, so knocked-out jobs are left out
+        name = f"shortlist-{'scored-' if scored_only else ''}{date.today().isoformat()}.xlsx"
+        return FileResponse(path, filename=name)
 
     async def http_error(request: Request, exc: HTTPException):
         return JSONResponse({"error": exc.detail}, exc.status_code)

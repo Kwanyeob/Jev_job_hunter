@@ -260,11 +260,19 @@ def _log_request(url: str, status, t0: float) -> None:
         pass  # the log is a measuring aid; never let it break a hunt
 
 
+def repost_key(card: dict) -> str:
+    """Company + title + place: recruiters repost the same job under a new job ID, which this still
+    matches. '' when the card has no title to go on."""
+    words = [" ".join(re.findall(r"\w+", (card.get(k) or "").lower())) for k in ("company", "title", "location")]
+    return "repost:" + "|".join(words) if words[1] else ""
+
+
 def collect_cards(client: GuestClient, query: str, location: str, posted: str, remote: str,
                   limit: int, seen: set[str] | None = None, emit=_noop, stop=None,
                   stop_at_seen: bool = False, experience=()) -> list[dict]:
-    """Cards for one search, 10 per request, deduped against `seen`. Each new card is emitted as read.
-    With `stop_at_seen`, paging stops at the first page holding a job already in `seen`."""
+    """Cards for one search, 10 per request, deduped against `seen` (job IDs and `repost_key`s).
+    Each new card is emitted as read. With `stop_at_seen`, paging stops at the first page holding a
+    job already in `seen`."""
     seen = set() if seen is None else seen
     params = search_params(query, location, posted, remote, experience)
     url = search_url(query, location, posted, remote, experience)
@@ -281,12 +289,12 @@ def collect_cards(client: GuestClient, query: str, location: str, posted: str, r
                 raise
             break  # keep what earlier pages gave
         pages += 1
-        reached_seen = any(c["id"] in seen for c in cards)
+        reached_seen = any(c["id"] in seen or repost_key(c) in seen for c in cards)
         for c in cards[:limit - total]:
-            if c["id"] in seen:
+            if c["id"] in seen or repost_key(c) in seen:
                 emit("seen", c)  # a job found before: lets the caller fill in details it lacked (logo)
             else:
-                seen.add(c["id"])
+                seen.update((c["id"], repost_key(c)))
                 card = {**c, "query": query}
                 new.append(card)
                 emit("card", card)

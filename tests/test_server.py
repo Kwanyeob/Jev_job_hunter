@@ -187,6 +187,12 @@ def test_dismissed_jobs_leave_results_and_excel_and_can_come_back(svc):
     wb = load_workbook(io.BytesIO(a.get("/api/export.xlsx").content))
     head = [c.value for c in wb["All listings"][1]]
     assert gone not in {r[head.index("Job ID")].value for r in wb["All listings"].iter_rows(min_row=2)}
+    assert wb.sheetnames[0] == "All listings" and wb.active.title == "All listings"  # all jobs open first
+    fits = [r[head.index("Overall fit")].value for r in wb["All listings"].iter_rows(min_row=2)]
+    assert fits[0] is not None and fits == sorted(fits, key=lambda f: f is not None, reverse=True)
+    scored = a.get("/api/export.xlsx?only=scored")
+    assert "scored" in scored.headers["content-disposition"]
+    assert load_workbook(io.BytesIO(scored.content)).sheetnames == ["Matches", "Profile"]
     assert b.post("/api/dismiss", json={"ids": [gone]}).json() == {"dismissed": 1}  # B's own list
     assert a.get("/api/results").json()["total"] == 2
 

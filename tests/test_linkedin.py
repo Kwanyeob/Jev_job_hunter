@@ -203,8 +203,8 @@ def test_authwall_skips_one_posting_and_still_writes(tmp_path, profile, monkeypa
 
 
 def test_search_pages_ten_at_a_time():
-    many = [{**CARDS[0], "id": str(5000 + i), "href": f"https://www.linkedin.com/jobs/view/x-{5000 + i}"}
-            for i in range(25)]
+    many = [{**CARDS[0], "id": str(5000 + i), "title": f"Backend Engineer {i}",
+             "href": f"https://www.linkedin.com/jobs/view/x-{5000 + i}"} for i in range(25)]
     site = FakeLinkedIn(cards=many)
     with redirect_stdout(io.StringIO()):
         got = linkedin.collect_cards(fake_client(site), "AI", "", "week", "any", limit=30)

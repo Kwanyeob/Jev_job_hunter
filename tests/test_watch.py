@@ -243,3 +243,23 @@ def test_jobs_found_before_logos_get_one_when_seen_again(tmp_path, profile):
     assert again["new"] == 0 and _postings_read(site) == 0  # nothing extra fetched for it
     saved = {c["id"]: c for c in WatchState.load(tmp_path, watch_key(QUERIES, "South Korea", "day", "any")).listings}
     assert saved["4001"]["logo"] == logo and not saved["4002"].get("logo")
+
+
+def test_reposts_under_a_new_job_id_are_not_new(tmp_path, profile):
+    prof = load_profile(ROOT, str(profile))
+    repost = {**CARDS[0], "id": "4998", "title": "Backend Engineer!", "posted_text": "1 hour ago"}
+    first = _cycle(tmp_path, prof, FakeLinkedIn(cards=[*CARDS, repost]), T0)  # same search, same cycle
+    assert first["new"] == len(CARDS)
+    later = {**CARDS[0], "id": "4999", "href": "https://www.linkedin.com/jobs/view/backend-engineer-4999"}
+    again = _cycle(tmp_path, prof, FakeLinkedIn(cards=[later, *CARDS[1:]]), T0 + timedelta(minutes=45))
+    assert again["new"] == 0
+
+
+def test_reposts_saved_earlier_are_dropped_on_load(tmp_path):
+    dup = {**CARDS[0], "id": "4998"}
+    st = WatchState(tmp_path / "w.json", "k", {"listings": [CARDS[0], dup, {**CARDS[0], "id": "4997"}],
+                                                "matches": [{"id": "4997", "fit": 0.5}],
+                                                "pending": [dup, CARDS[0]]})
+    assert [c["id"] for c in st.listings] == ["4001", "4997"]  # the scored one stays
+    assert [c["id"] for c in st.pending] == ["4001"]
+
