@@ -1,0 +1,20 @@
+# only the package, its config and the lockfile go into the image
+.env
+.env.*
+.git/
+.venv/
+**/__pycache__/
+data/
+state/
+results/
+tests/
+docs/
+scripts/
+skills/
+assets/
+config/profile.yaml
+*.pdf
+.codex/
+.gemini/
+.impeccable/
+.omc/

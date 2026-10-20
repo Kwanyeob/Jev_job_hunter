@@ -1,0 +1,25 @@
+# Shortlist on Fly.io: one always-on machine (the scheduler runs inside it), data on a volume.
+# Secrets (fly secrets set): TYPESAFE_API_KEY, ANTHROPIC_API_KEY, SECRET_KEY. See docs/OPERATIONS.md.
+app = "shortlist-kj"
+primary_region = "yyz"
+
+[build]
+
+[env]
+  PUBLIC_URL = "https://shortlist-kj.fly.dev"
+  TZ = "America/Toronto"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # stopping would stop every user's auto search
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[mounts]]
+  source = "shortlist_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
