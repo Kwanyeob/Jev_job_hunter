@@ -1,0 +1,34 @@
+# Push to main → run the tests → deploy to Fly.io (only when they pass).
+# Needs the repo secret FLY_API_TOKEN (fly tokens create deploy -a shortlist-kj). See docs/OPERATIONS.md.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md", "skills/**", "scripts/**", "assets/**"]
+  workflow_dispatch:  # "Run workflow" button on GitHub, to redeploy by hand
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false  # never cut a deploy off halfway
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --app shortlist-kj --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -10,6 +10,18 @@ Shortlist (`jjh serve`) runs on Fly.io as app **`shortlist-kj`**: one always-on 
 
 ## Deploy
 
+A push to `main` deploys by itself: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) runs the tests, and only when they pass runs `flyctl deploy`. Pushes that touch only docs or Markdown don't deploy. To redeploy without a change, use **Run workflow** on the repo's Actions tab.
+
+The workflow uses the repo secret `FLY_API_TOKEN`, a deploy token for this app only, valid for a year:
+
+```bash
+fly tokens create deploy --app shortlist-kj --name github-actions --expiry 8760h
+```
+
+Paste it at GitHub → Settings → Secrets and variables → Actions → `FLY_API_TOKEN`. When it expires, deploys fail at the deploy step; make a new one the same way.
+
+To deploy from this PC instead (it sends the working tree, uncommitted changes included):
+
 ```bash
 fly deploy --app shortlist-kj --remote-only --ha=false
 ```
