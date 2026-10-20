@@ -757,12 +757,10 @@ async function api(path, opts = {}) {
 const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 /* ---------- tabs ---------- */
-function showTab(name, quiet = false) {
+function showTab(name) {
   for (const tb of document.querySelectorAll(".tab")) tb.setAttribute("aria-selected", String(tb.dataset.tab === name));
   $("view-profile").hidden = name !== "profile";
   $("view-results").hidden = name !== "results";
-  if (!quiet && name === "results" && rows.length && $("tour").hidden && !store.get("jjh.tour.full"))
-    setTimeout(() => startTour("full", "jjh.tour.full"), 350);  // first visit with jobs on the tape
 }
 for (const tb of document.querySelectorAll(".tab")) tb.addEventListener("click", () => showTab(tb.dataset.tab));
 
@@ -773,8 +771,6 @@ function showOnboard(reupload = false) {
   document.querySelector(".slot .tear").hidden = !reader;
   $("manual").hidden = reupload; $("cancel-reupload").hidden = !reupload;
   msg("drop-msg", reader ? "" : t("no_reader"));
-  if (reupload && $("tour").hidden && !store.get("jjh.tour.reupload"))
-    setTimeout(() => startTour("reupload", "jjh.tour.reupload"), 350);  // first time on this screen
 }
 function showProfile() {
   $("onboard").hidden = true; $("profile-area").hidden = false;
@@ -847,7 +843,7 @@ async function upload(file) {
     await new Promise((r) => setTimeout(r, 600));
     fill(j.profile); hasProfile = true; showProfile();
     msg("profile-msg", t("filled"), "ok");
-    if (!reupload && !store.get("jjh.tour.profile")) setTimeout(() => startTour("fresh", ["jjh.tour.profile", "jjh.tour.full"]), 450);
+    if (!reupload && !store.get("jjh.tour.profile")) setTimeout(() => startTour("fresh", "jjh.tour.profile"), 450);
   } catch (e) {
     bar.fail(); showOnboard(reupload); msg("drop-msg", e.message, "err");
   }
@@ -1194,8 +1190,8 @@ function startTour(which, key) {
   if (!$("tour").hidden) return;  // already running (the first visit can ask twice)
   const was = currentTab(), all = tourSteps(which);
   if (all.some((s) => s.demo)) startDemo();  // so the sample rows count as on screen
-  tour.steps = all.filter((s) => { if (s.tab) showTab(s.tab, true); return !s.sel || find(s.sel); });
-  endDemo(); showTab(was, true);
+  tour.steps = all.filter((s) => { if (s.tab) showTab(s.tab); return !s.sel || find(s.sel); });
+  endDemo(); showTab(was);
   if (!tour.steps.length) return;
   tour.i = 0; tour.key = key;
   $("tour").hidden = false;
@@ -1206,12 +1202,12 @@ function endTour() {
   $("tour").hidden = true;
   document.documentElement.classList.remove("locked");
   endDemo();
-  for (const k of [].concat(tour.key || [])) store.set(k, "1");
+  if (tour.key) store.set(tour.key, "1");
 }
 function drawTour() {
   const s = tour.steps[tour.i], n = tour.steps.length;
   if (s.demo) startDemo(); else endDemo();
-  if (s.tab && s.tab !== currentTab()) { showTab(s.tab, true); scrollTo(0, 0); }
+  if (s.tab && s.tab !== currentTab()) { showTab(s.tab); scrollTo(0, 0); }
   const [title, body] = t(KEY_OF[s.name])[s.i];
   $("tour-title").textContent = title; $("tour-body").textContent = body;
   $("tour-step").innerHTML = `<b>${tour.i + 1}</b> / ${n}`;
@@ -1301,10 +1297,8 @@ $("help").addEventListener("click", () => {
   if (hasProfile) { fill(s.profile); showProfile(); showTab("results"); } else { showOnboard(); showTab("profile"); }
   applyLang();
   listen();
-  if (hasProfile && !store.get("jjh.tour.full")) {
-    store.set("jjh.tour.profile", "1");  // the full guide covers the profile too
-    setTimeout(() => startTour("full", "jjh.tour.full"), 350);
-  } else if (!hasProfile && !store.get("jjh.tour.main")) {
+  // guides open by themselves only for someone new (no profile yet); anyone else opens them with ?
+  if (!hasProfile && !store.get("jjh.tour.main")) {
     setTimeout(() => startTour("main", "jjh.tour.main"), 350);
   }
 })();
