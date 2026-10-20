@@ -45,10 +45,10 @@ def setup(tmp_path):
                       quiet=None, pause=pauses.append, rng=random.Random(3))
     real_run_one = sched.run_one
 
-    def run_one(uid):
+    def run_one(uid, kind="search"):
         current["uid"] = uid
         with redirect_stdout(io.StringIO()):
-            return real_run_one(uid)
+            return real_run_one(uid, kind)
 
     sched.run_one = run_one
     return users, sched, clock, sites, pauses, hub
@@ -137,7 +137,7 @@ def test_missing_profile_is_reported_not_fatal(setup):
     a = add_user(users, "A", with_profile=False)
     sched.run_now(a.id)
     assert sched.step() == a.id
-    assert "프로필" in hub.since(a.id, 0)[-1]["data"]["error"]
+    assert "profile" in hub.since(a.id, 0)[-1]["data"]["error"]
 
 
 def test_schedule_survives_restart(setup, tmp_path):
@@ -154,3 +154,74 @@ def test_revoked_users_are_skipped(setup):
     sched.set_enabled(a.id, True)
     users.revoke("A")
     assert sched.due(clock.t) == []
+
+
+def _postings(site) -> int:
+    return sum(1 for u in site.visited if "/jobPosting/" in u)
+
+
+def test_watch_on_searches_then_reads_the_queue_in_spaced_runs(setup, monkeypatch):
+    from jev_job_hunter import scheduler
+    monkeypatch.setattr(scheduler, "MAX_OPEN", 1)
+    users, sched, clock, sites, pauses, hub = setup
+    a = add_user(users, "A")
+    sched.set_enabled(a.id, True)
+
+    sched.step()  # search: lists + triages, reads nothing
+    assert _postings(sites[a.id]) == 0 and 60 <= pauses[-1] <= 180
+    st = sched.status(a.id)
+    assert st["pending"] == 2 and st["last"]["kind"] == "search"
+    gap = datetime.fromisoformat(st["next_read"]) - clock.t
+    assert timedelta(minutes=8) <= gap <= timedelta(minutes=14)
+    assert sched.due(clock.t) == []
+
+    clock.t += gap
+    assert sched.step() == a.id  # read: one posting from the queue, no search
+    site = sites[a.id]
+    assert _postings(site) >= 1 and not any(u.startswith(linkedin.GUEST_SEARCH) for u in site.visited)
+    assert 240 <= pauses[-1] <= 360  # longer rest after a read
+    st = sched.status(a.id)
+    assert st["pending"] == 1 and st["last_any"]["kind"] == "read" and st["last"]["kind"] == "search"
+    assert hub.since(a.id, 0)[-1]["data"]["kind"] == "read"
+
+    clock.t = datetime.fromisoformat(st["next_read"])
+    sched.step()
+    st = sched.status(a.id)
+    assert st["pending"] == 0 and st["next_read"] is None  # queue empty: no more read runs
+
+
+def test_one_off_search_with_watch_off_reads_right_away(setup):
+    users, sched, clock, sites, *_ = setup
+    a = add_user(users, "A")
+    sched.run_now(a.id)
+    sched.step()
+    assert _postings(sites[a.id]) >= 2  # no read runs follow, so it reads its share now
+    assert sched.schedule(a.id)["next_read"] is None
+
+
+def test_turning_the_watch_off_stops_reads(setup):
+    users, sched, clock, *_ = setup
+    a = add_user(users, "A")
+    sched.set_enabled(a.id, True)
+    sched.step()
+    assert sched.schedule(a.id)["next_read"]
+    sched.set_enabled(a.id, False)
+    assert sched.schedule(a.id)["next_read"] is None
+    assert sched.due(clock.t + timedelta(hours=1)) == []
+
+
+def test_user_picks_the_search_interval(setup):
+    users, sched, clock, *_ = setup
+    a = add_user(users, "A")
+    sched.set_enabled(a.id, True)
+    assert sched.status(a.id)["every"] == "30-60"
+    sched.step()  # first search at T0
+    sched.set_every(a.id, "180-240")  # a pending search moves to fit the slower pace
+    nxt = datetime.fromisoformat(sched.schedule(a.id)["next_run"])
+    assert timedelta(hours=3) <= nxt - T0 <= timedelta(hours=4) and sched.status(a.id)["every"] == "180-240"
+    clock.t = nxt
+    sched.step()
+    nxt2 = datetime.fromisoformat(sched.schedule(a.id)["next_run"])
+    assert timedelta(hours=3) <= nxt2 - clock.t <= timedelta(hours=4)
+    with pytest.raises(ValueError):
+        sched.set_every(a.id, "5-10")

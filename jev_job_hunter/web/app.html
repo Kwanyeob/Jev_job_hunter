@@ -3,290 +3,1179 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JevScout</title>
+<title>Shortlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f7f5; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e4e3de;
-    --accent: #2f5bd3; --accent-ink: #ffffff; --good: #1f8a4c; --warn: #b7791f; --bad: #c0392b;
-    --chip: #eef1fb; --row-hi: #f1f8f3; --drop: #f2f4fb; --new: #fff7e0;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c9b95; --line: #33332f;
-      --accent: #7c9cf5; --accent-ink: #0f1115; --good: #5cc98a; --warn: #e0b35a; --bad: #ef7a6c;
-      --chip: #262b3a; --row-hi: #1d2a22; --drop: #1c2030; --new: #2e2a1c;
-    }
+    --counter: #E6E5E0; --tape: #FBFBF8; --ink: #141414; --ink-2: #2B2B29; --muted: #5C5C57; --faint: #8D8C85;
+    --rule: #D3D1C9; --rule-2: #EAE8E2; --red: #D23B2E; --red-ink: #A82A1F; --field: #FFFFFF; --hover: #F2F1EC;
+    --sel: rgba(20, 20, 20, .14); --shadow: 0 1px 0 rgba(20,20,20,.06), 0 18px 40px -24px rgba(20,20,20,.35);
+    --sans: "Hanken Grotesk", "Noto Sans KR", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "Noto Sans KR", ui-monospace, monospace;
+    --gy: clamp(8px, 1.4vh, 18px); --fpad: clamp(7px, 1vh, 10px);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 14px/1.55 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-  h1 { font-size: 22px; margin: 0; }
-  .sub { color: var(--muted); }
-  .who { margin-left: auto; color: var(--muted); font-size: 13px; }
-  .banner { background: var(--new); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 13px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-  h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
-  h2 .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
-          display: inline-grid; place-items: center; font-size: 12px; }
-  #drop { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 22px 16px; text-align: center;
-          background: var(--drop); cursor: pointer; margin-bottom: 14px; }
-  #drop.over { border-color: var(--accent); }
-  #drop strong { display: block; font-size: 15px; margin-bottom: 2px; }
+  html { scrollbar-gutter: stable; scrollbar-color: var(--faint) transparent; }
+  html.locked { overflow: hidden; }
+  html, body { margin: 0; }
+  body { background: var(--counter); color: var(--ink); font: 15px/1.5 var(--sans); caret-color: var(--ink); -webkit-font-smoothing: antialiased; min-height: 100vh; word-break: keep-all; overflow-wrap: break-word; }
+  ::selection { background: var(--sel); color: var(--ink); }
+  [hidden] { display: none !important; }
+  a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--ink-2); text-decoration-thickness: 2px; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  /* ---------- top bar: the printer's ink strip ---------- */
+  .top { position: sticky; top: 0; z-index: 20; background: #141414; color: #F4F3EE; }
+  .top-in { max-width: 1240px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; gap: 22px; white-space: nowrap; }
+  .top-in > * { flex-shrink: 0; }
+  .brand { display: flex; align-items: baseline; gap: 2px; font: 800 18px/1 var(--mono); letter-spacing: .02em; color: #F4F3EE; text-decoration: none; }
+  .brand b { color: #8D8C85; font-weight: 800; }
+  .tabs { display: flex; height: 60px; }
+  .tab { border: 0; background: none; padding: 0 14px; height: 60px; cursor: pointer; color: #B9B8B2; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: inset 0 -3px transparent; }
+  .tab:hover { color: #F4F3EE; }
+  .tab[aria-selected="true"] { color: #F4F3EE; box-shadow: inset 0 -3px #FF6B5D; }
+  .badge { font: 700 12px/1 var(--mono); background: #F4F3EE; color: #141414; padding: 3px 6px; border-radius: 2px; }
+  .badge:empty { display: none; }
+  .spacer { flex: 1; }
+  .live { display: flex; align-items: center; gap: 8px; font: 500 13px/1 var(--sans); font-variant-numeric: tabular-nums; color: #D9D8D2; white-space: nowrap; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: #5FD38A; }
+  .live.off i { background: #77766F; }
+  .who { color: #B9B8B2; font-size: 13px; }
+  .lang { display: flex; border: 1px solid #4A4A46; border-radius: 3px; overflow: hidden; }
+  .lang button { border: 0; background: none; padding: 5px 9px; font: 700 12px/1 var(--mono); color: #B9B8B2; cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: #F4F3EE; color: #141414; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 3px; border: 1px solid #4A4A46; background: none; color: #D9D8D2; cursor: pointer; font: 700 14px/1 var(--mono); }
+  .icon-btn:hover { border-color: #F4F3EE; color: #F4F3EE; }
+  @media (max-width: 760px) { .who, .live { display: none; } .top-in { gap: 6px; padding: 0 10px; } .tabs { margin-left: 2px; } .tab { padding: 0 6px; font-size: 13.5px; } .brand { font-size: 14px; } .lang button { padding: 5px 6px; } .icon-btn { width: 30px; } }
+
+  .runbar { position: sticky; top: 60px; z-index: 19; background: var(--ink-2); color: #F4F3EE; border-top: 1px solid #3A3A37; }
+  .runbar-in { max-width: 1240px; margin: 0 auto; padding: 8px 24px; display: flex; gap: 12px; align-items: center; font: 600 13px/1.3 var(--sans); }
+  .runbar-in span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #5FD38A; }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 24px 24px 40px; }
+  .banner { border: 1px dashed var(--red); color: var(--red-ink); padding: 10px 14px; margin-bottom: 16px; font-size: 13px; background: var(--tape); }
+
+  /* ---------- paper: tape and slips ---------- */
+  .paper { background: var(--tape); box-shadow: var(--shadow); }
+  .perf { border: 0; border-top: 1.5px dashed var(--rule); margin: 0; }
+  .tear { height: 10px; background: var(--tape);
+    -webkit-mask: conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / 14px 100%;
+            mask: conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / 14px 100%; transform: scaleY(-1); }
+  .tear.bottom { transform: none; }
+
+  /* ---------- jobs found ---------- */
+  .board { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .tape { flex: 999 1 600px; min-width: 0; max-width: 880px; }
+  .tape-body { padding: 22px 28px 8px; }
+  .tape-head { text-align: center; padding-bottom: 16px; }
+  .tape-head h1 { margin: 0; font: 800 26px/1.1 var(--mono); letter-spacing: .14em; }
+  .tape-head p { margin: 6px 0 0; font: 500 12.5px/1.4 var(--mono); color: var(--muted); letter-spacing: .02em; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 14px 0; }
+  .search { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid var(--rule); background: var(--field); border-radius: 3px; color: var(--muted); }
+  .search:focus-within { border-color: var(--ink); }
+  .search input[type=text] { border: 0; outline: 0; box-shadow: none; background: transparent; width: 100%; padding: 0; font: inherit; color: var(--ink); }
+  .search input::placeholder { color: var(--muted); }
+  .sel { height: 40px; padding: 0 30px 0 12px; border: 1px solid var(--rule); background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%235C5C57' stroke-width='1.6'%3E%3Cpath d='m1 1 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center; border-radius: 3px; font: inherit; font-size: 14px; color: var(--ink); appearance: none; max-width: 240px; }
+
+  .cut { display: flex; align-items: center; gap: 12px; margin: 18px 0 2px; font: 700 12.5px/1 var(--sans); font-variant-numeric: tabular-nums; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+  .cut::before, .cut::after { content: ""; flex: 1; border-top: 1.5px dashed var(--rule); }
+  .cut.latest { color: var(--red-ink); }
+  .cut.latest::before, .cut.latest::after { border-color: var(--red); }
+  .line { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 76px; gap: 14px; align-items: center; padding: 12px 6px; border-bottom: 1px dotted var(--rule); position: relative; }
+  .line:hover { background: var(--hover); }
+  .line.arrive { animation: print .9s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes print { from { clip-path: inset(0 0 100% 0); transform: translateY(-10px); } to { clip-path: inset(0 0 0 0); transform: none; } }
+  .line.leaving { opacity: 0; transform: translateX(24px); transition: opacity .2s, transform .2s cubic-bezier(.16,1,.3,1); }
+  .logo { position: relative; width: 40px; height: 40px; border-radius: 3px; overflow: hidden; display: grid; place-items: center; background: var(--rule-2); color: var(--ink-2); font: 700 12px/1 var(--mono); }
+  .logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; mix-blend-mode: multiply; filter: grayscale(1) contrast(1.15); transition: opacity .3s, filter .25s; }
+  .logo.img { background: transparent; color: transparent; }
+  .logo.img img { opacity: 1; }
+  .line:hover .logo img, .line:focus-within .logo img { filter: none; }
+  .ttl { font-weight: 700; font-size: 15.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .meta .q { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 12.5px; color: var(--ink-2); }
+  .meta .q svg { width: 12px; height: 12px; }
+  .score { text-align: right; font: 800 19px/1 var(--mono); font-variant-numeric: tabular-nums; cursor: help; padding: 6px 7px; border-radius: 2px; white-space: nowrap; }
+  .score small { font-size: 12px; font-weight: 500; margin-left: 1px; }
+  .score.hi { background: var(--ink); color: var(--tape); }
+  .score.lo { color: var(--muted); }
+  .score:hover:not(.hi) { background: var(--rule-2); }
+  .wait { font: 600 12.5px/1.2 var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; white-space: nowrap; cursor: help; text-decoration: underline dotted var(--faint); text-underline-offset: 4px; }
+  .wait.now { color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .wait.now i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+  .acts { display: flex; justify-content: flex-end; gap: 2px; }
+  .act { width: 36px; height: 36px; border-radius: 3px; border: 0; background: none; display: grid; place-items: center; color: var(--muted); cursor: pointer; text-decoration: none; }
+  .act:hover { background: var(--rule-2); color: var(--ink); }
+  .act.x:hover { color: var(--red-ink); }
+  @media (hover: hover) { .acts { opacity: .35; transition: opacity .15s; } .line:hover .acts, .line:focus-within .acts { opacity: 1; } }
+  .total { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 2px solid var(--ink); margin-top: 14px; padding: 12px 6px 14px; font: 800 14px var(--sans); font-variant-numeric: tabular-nums; }
+  .empty { text-align: center; padding: 44px 16px; color: var(--muted); }
+  .empty b { display: block; color: var(--ink); font: 800 16px var(--sans); margin-bottom: 4px; }
+  @media (max-width: 640px) {
+    .tape-body { padding: 18px 14px 6px; }
+    .line { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "logo txt score" "logo txt acts"; row-gap: 2px; padding: 12px 2px; }
+    .line .logo { grid-area: logo; width: 36px; height: 36px; align-self: start; } .line .txt { grid-area: txt; } .line .sc { grid-area: score; justify-self: end; } .line .acts { grid-area: acts; }
+    .ttl { white-space: normal; font-size: 15px; }
+  }
+
+  /* margin rail: the printer's status slip */
+  .rail { flex: 1 1 280px; min-width: 0; max-width: 340px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 84px; }
+  .slip { padding: 18px 20px; }
+  .slip h2 { margin: 0 0 8px; font: 700 13px/1.2 var(--sans); letter-spacing: .02em; color: var(--muted); }
+  .big { font: 800 40px/1 var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .slots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 12px 0 2px; }
+  .slots i { height: 12px; background: var(--rule-2); border-radius: 1px; }
+  .slots i.on { background: var(--ink); }
+  .views { display: flex; flex-wrap: wrap; gap: 6px; }
+  .view { height: 36px; padding: 0 12px; border-radius: 3px; border: 1px solid var(--rule); background: var(--field); cursor: pointer; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .view .n { font: 500 12px var(--mono); color: var(--muted); }
+  .view:hover { border-color: var(--ink); }
+  .view[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--tape); }
+  .view[aria-pressed="true"] .n { color: var(--tape); opacity: .75; }
+  @media (max-width: 1000px) { .tape { max-width: none; } .rail { position: static; max-width: none; flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } .big { font-size: 32px; } }
+  .tools .views { flex-basis: 100%; }
+  .mstrip { display: none; }
+  @media (max-width: 760px) {
+    main { padding: 14px 12px 32px; }
+    .mstrip { display: flex; align-items: center; gap: 12px; flex-basis: 100%; padding: 10px 12px; font-size: 13px; color: var(--muted); }
+    .mstrip b { color: var(--ink); font-size: 16px; }
+    .mstrip .ms-q { margin-right: auto; }
+    .mstrip .ms-cap { font: 500 12px var(--mono); }
+    .board { gap: 12px; }
+    .tape-head { padding-bottom: 10px; }
+    .tape-head h1 { font-size: 20px; }
+    .tape-head p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tools { padding: 10px 0; gap: 6px; }
+    .tools .views { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .tools .view { flex: none; height: 34px; }
+    .cut { margin-top: 12px; }
+  }
+
+  /* ---------- buttons, fields ---------- */
+  .btn { height: 44px; padding: 0 18px; border-radius: 3px; border: 1px solid var(--ink); background: var(--ink); color: var(--tape); cursor: pointer; font-weight: 700; font-size: 14.5px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+  .btn:hover { background: var(--ink-2); color: var(--tape); }
+  .btn.line-btn { background: transparent; color: var(--ink); border-color: var(--rule); }
+  .btn.line-btn:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
+  .btn.sm { height: 36px; padding: 0 12px; font-size: 13.5px; }
+  .btn.wide { width: 100%; }
+  .btn:disabled { background: transparent; color: var(--muted); border: 1px dashed var(--rule); cursor: not-allowed; }
+  .hint-wrap { position: relative; display: block; }
+  .hint-wrap[data-hint]:hover::after, .hint-wrap[data-hint]:focus-within::after {
+    content: attr(data-hint); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: max-content; max-width: 260px;
+    padding: 9px 12px; background: var(--ink); color: var(--tape); font-size: 12.5px; line-height: 1.5; text-align: left; z-index: 30; border-radius: 3px; pointer-events: none; }
+  .msg { min-height: 1.3em; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .msg.err { color: var(--red-ink); } .msg.ok { color: var(--ink); font-weight: 600; }
+  .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 4px; padding: 10px; font-size: 14px; }
+  .link-btn:hover { color: var(--ink); }
+
+  /* ---------- first screen ---------- */
+  .hero { max-width: 1040px; margin: clamp(16px, 6vh, 64px) auto 0; display: flex; flex-wrap: wrap; gap: 40px; align-items: center; }
+  .hero-copy { flex: 1 1 360px; min-width: 0; }
+  .hero h1 { margin: 0 0 14px; font: 800 clamp(34px, 4.6vw, 56px)/1.05 var(--sans); letter-spacing: -.035em; text-wrap: balance; }
+  .hero .lead { margin: 0 0 22px; font-size: 17px; color: var(--muted); max-width: 46ch; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; }
+  .steps li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: baseline; }
+  .steps .mono { font-weight: 700; color: var(--muted); font-size: 12.5px; }
+  .steps b { display: block; }
+  .slot { flex: 1 1 420px; min-width: 0; }
+  #drop { display: block; cursor: pointer; text-align: center; padding: 30px 28px 34px; transition: transform .25s cubic-bezier(.16,1,.3,1); }
+  #drop:hover, #drop.over { transform: translateY(-3px); }
+  #drop .well { border: 1.5px dashed var(--rule); padding: 38px 18px; display: grid; justify-items: center; gap: 10px; transition: border-color .2s; }
+  #drop.over .well, #drop:hover .well { border-color: var(--ink); }
+  #drop .ico { width: 54px; height: 54px; border-radius: 3px; background: var(--ink); color: var(--tape); display: grid; place-items: center; }
+  #drop .ico svg { width: 26px; height: 26px; }
+  #drop strong { font-size: 18px; letter-spacing: -.01em; }
+  #drop .dim { color: var(--muted); font-size: 13.5px; }
   #drop input { display: none; }
-  .msg { margin-top: 8px; min-height: 1.4em; color: var(--muted); }
-  .msg.err { color: var(--bad); }
-  .msg.ok { color: var(--good); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 16px; }
-  .wide { grid-column: 1 / -1; }
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  input[type=text], input[type=number], select, textarea {
-    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
-    background: var(--bg); color: var(--ink); font: inherit; }
-  textarea { min-height: 60px; resize: vertical; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
-  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line);
-           background: var(--panel); color: var(--ink); cursor: pointer; }
-  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  button:disabled { opacity: .45; cursor: default; }
-  .switch { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
-  .switch input { width: 18px; height: 18px; }
-  .facts { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 13px; }
-  .facts b { color: var(--ink); font-weight: 600; }
-  #live { margin-top: 10px; color: var(--accent); min-height: 1.4em; }
-  .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-  .tools input[type=text] { max-width: 260px; }
-  .count { color: var(--muted); font-size: 13px; }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-  table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--bg); white-space: nowrap; }
-  tr.fit-hi td { background: var(--row-hi); }
-  tr.fresh td:first-child { box-shadow: inset 3px 0 var(--warn); }
-  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .title { font-weight: 600; }
-  .dim { color: var(--muted); }
-  a { color: var(--accent); }
-  .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--chip); white-space: nowrap; }
-  .tag.new { background: var(--new); color: var(--warn); }
-  .empty { padding: 28px; text-align: center; color: var(--muted); }
+  #upload { padding: 22px 24px; }
+  .up-top { display: flex; justify-content: space-between; gap: 12px; font: 600 13px var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); margin-bottom: 10px; }
+  .up-top b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { height: 8px; background: var(--rule-2); overflow: hidden; }
+  .fill { height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 8px); transition: width .3s cubic-bezier(.16,1,.3,1); }
+  .up-step { margin-top: 12px; font: 700 13.5px var(--sans); color: var(--ink); }
+
+  /* ---------- profile ---------- */
+  .cols { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  #profile-card { flex: 999 1 560px; min-width: 0; padding: clamp(18px, 2.6vh, 28px); display: flex; flex-direction: column; min-height: calc(100vh - 116px); }
+  #watch-card { flex: 1 1 300px; min-width: 0; padding: 22px; }
+  @media (max-width: 860px) { #profile-card { min-height: 0; } }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: calc(var(--gy) * 1.2); }
+  .card-head h2 { margin: 0; font: 800 20px/1.2 var(--sans); letter-spacing: -.02em; }
+  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gy) 14px; }
+  .grow { flex: 1; align-content: space-between; }
+  .s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; } .s7 { grid-column: span 7; } .s12 { grid-column: span 12; }
+  @media (max-width: 720px) { .grid > div { grid-column: 1 / -1; } }
+  label.f, .f { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
+  .opt { font-weight: 400; color: var(--muted); margin-left: 4px; }
+  input[type=text], input[type=number], select.field, textarea {
+    width: 100%; padding: var(--fpad) 11px; border: 1px solid var(--rule); border-radius: 3px; background: var(--field); color: var(--ink); font: inherit; font-size: 14.5px; }
+  input[type=number] { font-family: var(--mono); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--sel); }
+  #summary { min-height: 0; height: clamp(52px, 8.5vh, 96px); resize: vertical; }
+  .sub-head { margin: calc(var(--gy) * 2.2) 0 var(--gy); padding-top: var(--gy); border-top: 1.5px dashed var(--rule); font: 700 13px var(--sans); letter-spacing: .02em; color: var(--muted); }
+  @media (max-height: 800px) { :root { --gy: 9px; } .sub-head { margin: 10px 0 8px; padding-top: 8px; } }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chips button { padding: calc(var(--fpad) - 1px) 9px; border-radius: 3px; border: 1px solid var(--rule); background: var(--field); color: var(--ink-2); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .chips button:hover { border-color: var(--ink); }
+  .chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--tape); }
+  #profile-card .row { margin-top: auto; padding-top: calc(var(--gy) * 1.6); display: flex; align-items: center; gap: 14px; }
+  #profile-card .row .msg { margin-top: 0; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1.5px dashed var(--rule); cursor: pointer; }
+  .toggle b { display: block; font-size: 15px; } .toggle small { color: var(--muted); font-size: 13px; }
+  .sw { position: relative; flex: 0 0 46px; height: 26px; }
+  .sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .sw i { position: absolute; inset: 0; border-radius: 3px; background: var(--rule); transition: background .2s; }
+  .sw i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 2px; background: var(--tape); transition: transform .25s cubic-bezier(.16,1,.3,1); }
+  .sw input:checked + i { background: var(--ink); }
+  .sw input:checked + i::after { transform: translateX(20px); }
+  .sw input:focus-visible + i { outline: 2px solid var(--red); outline-offset: 2px; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1.5px dashed var(--rule); }
+  .fact { padding: 12px 0; } .fact + .fact { padding-left: 14px; border-left: 1px dotted var(--rule); }
+  .fact small { display: block; color: var(--muted); font: 700 12.5px var(--sans); margin-bottom: 4px; }
+  .fact b { font: 800 22px/1.1 var(--mono); }
+  .fact select.every { border: 0; background: transparent; font: 700 15px var(--sans); color: var(--ink); padding: 2px 0; cursor: pointer; }
+  #last-result { margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+  #last-result b { color: var(--ink); font-family: var(--mono); }
+  #watch-card .run { margin-top: 14px; }
+  .how-wrap { margin-top: 18px; border-top: 1.5px dashed var(--rule); padding-top: 12px; }
+  .how { font-size: 13.5px; color: var(--muted); }
+  .how summary { cursor: pointer; font-weight: 700; color: var(--ink); list-style: none; display: flex; align-items: center; gap: 8px; }
+  .how summary::-webkit-details-marker { display: none; }
+  .how summary::before { content: ""; width: 7px; height: 7px; border-right: 1.8px solid var(--ink); border-bottom: 1.8px solid var(--ink); transform: rotate(-45deg); transition: transform .2s; }
+  .how[open] summary::before { transform: rotate(45deg); }
+  .how ol { margin: 10px 0 6px; padding-left: 18px; } .how li { margin: 5px 0; } .how b { color: var(--ink); } .how p { margin: 6px 0 0; }
+
+  /* ---------- floating slips: tooltip, toast, guide ---------- */
+  #tip { position: fixed; z-index: 45; width: 250px; background: var(--tape); border: 1px solid var(--rule); box-shadow: var(--shadow); padding: 14px 16px; font-size: 13px; pointer-events: none; }
+  #tip h4 { margin: 0 0 8px; font: 700 12.5px var(--sans); color: var(--muted); }
+  #tip .br { display: grid; grid-template-columns: 52px 1fr 34px; gap: 8px; align-items: center; margin: 5px 0; }
+  #tip .br span { height: 5px; background: var(--rule-2); overflow: hidden; } #tip .br i { display: block; height: 100%; background: var(--ink); }
+  #tip .br b { text-align: right; font: 700 12.5px var(--mono); }
+  #tip .tot { border-top: 1.5px dashed var(--rule); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; font: 800 14px var(--sans); font-variant-numeric: tabular-nums; }
+  #tip .note { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  #tip.hint { width: auto; max-width: 280px; line-height: 1.55; color: var(--ink); }
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; background: var(--ink); color: var(--tape); padding: 11px 16px; border-radius: 3px; font-size: 13.5px; display: flex; gap: 16px; align-items: center; transition: opacity .2s, transform .3s cubic-bezier(.16,1,.3,1); z-index: 40; max-width: calc(100% - 32px); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #toast button { border: 0; background: none; color: #FF8A7E; font-weight: 700; cursor: pointer; padding: 0; }
+  #tour { position: fixed; inset: 0; z-index: 50; }
+  #tour .scrim { position: absolute; inset: 0; background: rgba(15,15,14,.62); }
+  #tour.spot .scrim { background: transparent; }
+  .hole { position: absolute; border-radius: 3px; box-shadow: 0 0 0 9999px rgba(15,15,14,.62), 0 0 0 2px #FBFBF8; pointer-events: none; }
+  #tour.clickable .hole { animation: ring 1.4s cubic-bezier(.16,1,.3,1) 2; }
+  @keyframes ring { 50% { box-shadow: 0 0 0 9999px rgba(15,15,14,.62), 0 0 0 6px rgba(251,251,248,.55); } }
+  #tour.moving .hole { transition: left .3s cubic-bezier(.16,1,.3,1), top .3s cubic-bezier(.16,1,.3,1), width .3s, height .3s; }
+  #tour.moving .pop { transition: top .3s cubic-bezier(.16,1,.3,1), left .3s cubic-bezier(.16,1,.3,1); }
+  .pop { position: absolute; width: min(360px, calc(100vw - 32px)); background: var(--tape); padding: 18px 18px 14px; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+  .pop h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.015em; }
+  .pop p { margin: 0; color: var(--muted); font-size: 14px; }
+  .pop-nav { display: flex; align-items: center; gap: 8px; margin-top: 16px; border-top: 1.5px dashed var(--rule); padding-top: 12px; }
+  .dots { display: flex; gap: 4px; margin-right: auto; }
+  .dots i { width: 6px; height: 6px; background: var(--rule); transition: all .2s; } .dots i.on { width: 18px; background: var(--ink); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>JevScout</h1>
-    <span class="sub">이력서에 맞는 LinkedIn 공고를 자동으로 찾아 드립니다</span>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#" aria-label="Shortlist">SHORT<b>/</b>LIST</a>
+    <nav class="tabs" role="tablist">
+      <button class="tab" id="tab-results" role="tab" data-tab="results" aria-selected="false"><span data-i18n="tab_results"></span><span class="badge" id="badge"></span></button>
+      <button class="tab" id="tab-profile" role="tab" data-tab="profile" aria-selected="true" data-i18n="tab_profile"></button>
+    </nav>
+    <span class="spacer"></span>
+    <span class="live off" id="live-top"><i></i><span id="live-top-text"></span></span>
     <span class="who" id="who"></span>
-  </header>
-  <div class="banner" id="mock-banner" hidden>지금은 테스트 모드입니다. 적합도 점수가 실제 평가가 아니라 키워드 규칙으로 계산됩니다.</div>
+    <div class="lang" id="lang" role="group" aria-label="Language"><button type="button" data-lang="ko">KO</button><button type="button" data-lang="en">EN</button></div>
+    <button class="icon-btn" id="help" data-i18n-title="help_title" data-i18n-aria="help_label">?</button>
+  </div>
+</header>
+<div class="runbar" id="runbar" hidden><div class="runbar-in"><div class="feed"></div><span id="live"></span></div></div>
 
-  <section>
-    <h2><span class="n">1</span>이력서와 프로필</h2>
-    <label id="drop" for="file">
-      <strong>이력서 PDF를 여기에 끌어다 놓으세요</strong>
-      <span class="dim">또는 눌러서 파일을 고르세요. AI가 한 번 읽고 아래 프로필을 채웁니다. 이름·연락처는 저장하지 않습니다.</span>
-      <input type="file" id="file" accept="application/pdf,.pdf">
-    </label>
-    <div class="grid">
-      <div class="wide"><label for="headline">한 줄 소개</label><input type="text" id="headline"></div>
-      <div class="wide"><label for="summary">경력 요약</label><textarea id="summary"></textarea></div>
-      <div><label for="years">경력 (년)</label><input type="number" id="years" min="0" step="0.5"></div>
-      <div><label for="seniority">연차 수준</label>
-        <select id="seniority"><option value="intern">인턴</option><option value="entry">신입</option><option value="mid" selected>경력 (주니어~미들)</option><option value="senior">시니어</option><option value="staff">스태프 이상</option></select></div>
-      <div class="wide"><label for="skills">기술</label><input type="text" id="skills"><div class="hint">쉼표로 구분</div></div>
-      <div><label for="roles">희망 직무</label><input type="text" id="roles"><div class="hint">쉼표로 구분 (필수)</div></div>
-      <div><label for="locations">희망 근무지</label><input type="text" id="locations"></div>
-      <div><label for="languages">언어</label><input type="text" id="languages"></div>
-    </div>
-    <div class="grid" style="margin-top:16px">
-      <div class="wide"><label for="queries">LinkedIn 검색어</label><input type="text" id="queries">
-        <div class="hint" id="queries-hint">쉼표로 구분, 최대 3개 (예: Backend Engineer, AI Engineer)</div></div>
-      <div><label for="location">검색 지역</label><input type="text" id="location" placeholder="예: Seoul, South Korea"></div>
-      <div><label for="remote">근무 형태</label>
-        <select id="remote"><option value="any">상관없음</option><option value="remote">원격</option><option value="hybrid">하이브리드</option><option value="onsite">출근</option></select></div>
-    </div>
-    <div class="row"><button class="primary" id="save">프로필 저장</button></div>
-    <div class="msg" id="profile-msg"></div>
-  </section>
+<main>
+  <div class="banner" id="mock-banner" hidden data-i18n="mock_banner"></div>
 
-  <section>
-    <h2><span class="n">2</span>자동 수집</h2>
-    <label class="switch"><input type="checkbox" id="watch"> 30~60분마다 새 공고 찾기 <span class="dim">(새벽 1~7시는 쉼)</span></label>
-    <div class="facts">
-      <span>마지막 실행 <b id="last">없음</b></span>
-      <span>다음 실행 <b id="next">-</b></span>
-      <span id="last-result"></span>
+  <div id="view-profile">
+    <div class="hero" id="onboard">
+      <div class="hero-copy">
+        <h1 data-i18n="hero_title"></h1>
+        <p class="lead" data-i18n="hero_lead"></p>
+        <ol class="steps" id="how">
+          <li><span class="mono">01</span><span><b data-i18n="how1_b"></b><span data-i18n="how1"></span></span></li>
+          <li><span class="mono">02</span><span><b data-i18n="how2_b"></b><span data-i18n="how2"></span></span></li>
+          <li><span class="mono">03</span><span><b data-i18n="how3_b"></b><span data-i18n="how3"></span></span></li>
+        </ol>
+      </div>
+      <div class="slot">
+        <label id="drop" class="paper" for="file">
+          <span class="well">
+            <span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg></span>
+            <strong data-i18n="drop_title"></strong>
+            <span class="dim" data-i18n="drop_sub"></span>
+          </span>
+          <input type="file" id="file" accept="application/pdf,.pdf">
+        </label>
+        <div class="tear bottom" aria-hidden="true"></div>
+        <div id="upload" class="paper" hidden>
+          <div class="up-top"><b id="up-name"></b><span id="up-pct">0%</span></div>
+          <div class="track"><div class="fill" id="up-fill"></div></div>
+          <div class="up-step" id="up-step"></div>
+        </div>
+        <div class="msg" id="drop-msg"></div>
+        <div style="text-align:center">
+          <button class="link-btn" id="manual" data-i18n="manual"></button>
+          <button class="link-btn" id="cancel-reupload" hidden data-i18n="back"></button>
+        </div>
+      </div>
     </div>
-    <div class="row"><button id="run-now">지금 한 번 찾기</button></div>
-    <div id="live"></div>
-    <div class="msg" id="watch-msg"></div>
-  </section>
 
-  <section>
-    <h2><span class="n">3</span>찾은 공고</h2>
-    <div class="tools">
-      <input type="text" id="filter" placeholder="제목, 회사, 지역으로 거르기">
-      <label class="switch" style="font-size:13px"><input type="checkbox" id="only-scored"> 적합도 평가된 것만</label>
-      <span class="count" id="count"></span>
-      <span style="flex:1"></span>
-      <button id="export" disabled>Excel 다운로드</button>
+    <div class="cols" id="profile-area" hidden>
+      <section class="paper" id="profile-card">
+        <div class="card-head"><h2 data-i18n="profile_h"></h2><span class="spacer"></span><button class="btn sm line-btn" id="reupload" data-i18n="reupload"></button></div>
+        <div class="grid grow">
+          <div class="s12"><label class="f" for="headline" data-i18n="f_headline"></label><input type="text" id="headline"></div>
+          <div class="s12"><label class="f" for="summary" data-i18n="f_summary"></label><textarea id="summary" rows="3"></textarea></div>
+          <div class="s2"><label class="f" for="years" data-i18n="f_years"></label><input type="number" id="years" min="0" step="0.5"></div>
+          <div class="s3"><label class="f" for="seniority" data-i18n="f_seniority"></label>
+            <select id="seniority" class="field"><option value="intern" data-i18n="sen_intern"></option><option value="entry" data-i18n="sen_entry"></option><option value="mid" selected data-i18n="sen_mid"></option><option value="senior" data-i18n="sen_senior"></option><option value="staff" data-i18n="sen_staff"></option></select></div>
+          <div class="s7" id="target-sen-field"><span class="f" id="target-sen-label"><span data-i18n="f_target"></span> <span class="opt" data-i18n="f_target_opt"></span></span>
+            <div class="chips" id="target-sen" role="group" aria-labelledby="target-sen-label">
+              <button type="button" data-v="intern" data-i18n="ts_intern"></button><button type="button" data-v="entry" data-i18n="ts_entry"></button><button type="button" data-v="associate" data-i18n="ts_associate"></button><button type="button" data-v="mid_senior" data-i18n="ts_mid_senior"></button><button type="button" data-v="director" data-i18n="ts_director" data-i18n-title="ts_director_title"></button>
+            </div></div>
+          <div class="s12"><label class="f" for="skills"><span data-i18n="f_skills"></span> <span class="opt" data-i18n="opt_comma"></span></label><input type="text" id="skills"></div>
+          <div class="s6"><label class="f" for="roles"><span data-i18n="f_roles"></span> <span class="opt" data-i18n="opt_roles"></span></label><input type="text" id="roles"></div>
+          <div class="s3"><label class="f" for="locations" data-i18n="f_locations"></label><input type="text" id="locations"></div>
+          <div class="s3"><label class="f" for="languages" data-i18n="f_languages"></label><input type="text" id="languages"></div>
+        </div>
+        <div class="sub-head" data-i18n="sub_search"></div>
+        <div class="grid" id="search-fields">
+          <div class="s5"><label class="f" for="queries"><span data-i18n="f_queries"></span> <span class="opt" data-i18n="opt_queries"></span></label><input type="text" id="queries" data-i18n-ph="ph_queries"></div>
+          <div class="s4"><label class="f" for="location" data-i18n="f_location"></label><input type="text" id="location" data-i18n-ph="ph_location"></div>
+          <div class="s3"><label class="f" for="remote" data-i18n="f_remote"></label>
+            <select id="remote" class="field"><option value="any" data-i18n="rm_any"></option><option value="remote" data-i18n="rm_remote"></option><option value="hybrid" data-i18n="rm_hybrid"></option><option value="onsite" data-i18n="rm_onsite"></option></select></div>
+        </div>
+        <div class="row"><button class="btn" id="save" data-i18n="save"></button><div class="msg" id="profile-msg"></div></div>
+      </section>
+
+      <section class="paper" id="watch-card">
+        <div class="card-head"><h2 data-i18n="watch_h"></h2></div>
+        <label class="toggle" id="watch-toggle">
+          <span><b id="watch-label"></b><small data-i18n="watch_quiet"></small></span>
+          <span class="sw"><input type="checkbox" id="watch"><i></i></span>
+        </label>
+        <div class="facts">
+          <div class="fact"><small id="every-l" data-i18n="f_every"></small><select id="every" class="every" aria-labelledby="every-l"></select></div>
+          <div class="fact"><small data-i18n="next_search"></small><b id="next">-</b></div>
+        </div>
+        <div id="last-result"></div>
+        <div class="run"><span class="hint-wrap" id="run-now-wrap"><button class="btn wide" id="run-now"></button></span></div>
+        <div class="msg" id="watch-msg"></div>
+        <div class="how-wrap"><details class="how" id="how-collect"><summary data-i18n="how_summary"></summary><div id="how-body"></div></details></div>
+      </section>
     </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>공고</th><th>회사</th><th>지역</th><th>적합도</th><th>처음 발견</th><th>링크</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="6" class="empty">아직 찾은 공고가 없습니다.</td></tr></tbody>
-      </table>
-    </div>
-  </section>
+  </div>
+
+  <div class="board" id="view-results" hidden>
+    <div class="mstrip paper" id="mstrip"><span class="ms-t"><b class="mono" id="ms-next">--:--</b> <span id="ms-next-l"></span></span><span class="ms-q"><b class="mono" id="ms-queue">0</b><span class="ms-cap"> / 30</span> <span data-i18n="rail_queue"></span></span><button class="btn sm" id="ms-run" aria-describedby="ms-next-l"></button></div>
+    <section class="tape" aria-labelledby="tape-title">
+      <div class="tear" aria-hidden="true"></div>
+      <div class="paper tape-body">
+        <div class="tape-head"><h1 id="tape-title">SHORTLIST</h1><p id="tape-sub"></p></div>
+        <hr class="perf">
+        <div class="tools">
+          <label class="search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr" data-i18n="filter_ph"></span><input type="text" id="filter" data-i18n-ph="filter_ph"></label>
+          <select id="qfilter" class="sel" aria-label="query"></select>
+          <div class="views" id="views" role="group" aria-label="view">
+          <button type="button" class="view" data-view="all" aria-pressed="true"><span data-i18n="view_all"></span><span class="n" id="vc-all"></span></button>
+          <button type="button" class="view" data-view="scored" aria-pressed="false"><span data-i18n="view_scored"></span><span class="n" id="vc-scored"></span></button>
+          <button type="button" class="view" data-view="strong" aria-pressed="false"><span data-i18n="view_strong"></span><span class="n" id="vc-strong"></span></button>
+          <button type="button" class="view" data-view="wait" aria-pressed="false"><span data-i18n="view_wait"></span><span class="n" id="vc-wait"></span></button>
+        </div>
+        </div>
+        <div id="rows"></div>
+        <div class="total" id="total" hidden><span id="count"></span><span id="strong-count"></span></div>
+      </div>
+      <div class="tear bottom" aria-hidden="true"></div>
+    </section>
+
+    <aside class="rail" aria-label="status">
+      <section class="paper slip">
+        <h2 data-i18n="rail_next"></h2>
+        <div class="big" id="rail-next">--:--</div>
+        <div class="sub" id="rail-next-sub"></div>
+        <div class="run" style="margin-top:14px"><span class="hint-wrap" id="rail-run-wrap"><button class="btn wide" id="rail-run"></button></span></div>
+      </section>
+      <section class="paper slip">
+        <h2 data-i18n="rail_queue"></h2>
+        <div class="big" id="rail-queue">0<span style="font-size:18px;color:var(--muted)"> / 30</span></div>
+        <div class="slots" id="rail-slots" aria-hidden="true"></div>
+        <div class="sub" id="rail-queue-sub"></div>
+      </section>
+      <section class="paper slip">
+        <button class="btn line-btn wide" id="export" disabled><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span data-i18n="export"></span></button>
+      </section>
+    </aside>
+  </div>
 </main>
+
+<div id="tip" hidden role="tooltip"></div>
+<div id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" hidden data-i18n="undo"></button></div>
+
+<div id="tour" hidden>
+  <div class="scrim"></div>
+  <div class="hole" id="tour-hole"></div>
+  <div class="pop" id="tour-pop" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <h3 id="tour-title"></h3>
+    <p id="tour-body"></p>
+    <div class="pop-nav">
+      <div class="dots" id="tour-dots"></div>
+      <button class="link-btn" id="tour-skip" data-i18n="tour_skip"></button>
+      <button class="btn sm line-btn" id="tour-prev" data-i18n="tour_prev"></button>
+      <button class="btn sm" id="tour-next"></button>
+    </div>
+  </div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let rows = [], lastAt = null, maxQueries = 3, es = null;
+let rows = [], maxQueries = 3, reader = true, hasProfile = false, knownIds = new Set(), watchState = null, userName = "", view = "all", profileSearch = null;
+const QUEUE_CAP = 30;
+
+/* ---------- language ---------- */
+const EVERY = {  // search intervals the server accepts (scheduler.EVERY_OPTIONS)
+  "30-60": { ko: "30~60분", en: "every 30–60 min" },
+  "60-120": { ko: "1~2시간", en: "every 1–2 hours" },
+  "180-240": { ko: "3~4시간", en: "every 3–4 hours" },
+  "360-480": { ko: "6~8시간", en: "every 6–8 hours" },
+};
+const STR = {
+  ko: {
+    tab_profile: "내 프로필", tab_results: "찾은 공고", help_title: "사용 안내 다시 보기", help_label: "도움말",
+    ms_next: "다음 출력", ms_run: "지금 찾기",
+    mock_banner: "지금은 테스트 모드입니다. 적합도 점수가 실제 평가가 아니라 키워드 규칙으로 계산됩니다.",
+    hero_title: "이력서 한 장이면, 맞는 공고가 계속 쌓여요",
+    hero_lead: "AI가 이력서를 읽고 프로필을 만들면, Shortlist가 LinkedIn에서 새 공고를 알아서 찾아 목록에 출력해요. 창을 닫아도 계속 찾고, Jev가 하나하나 적합도를 매겨요.",
+    drop_title: "이력서 PDF를 여기에 놓으세요", drop_sub: "또는 눌러서 파일 고르기 · 이름과 연락처는 저장하지 않아요",
+    how1_b: "이력서 드롭", how1: "AI가 경력·기술·희망 직무를 정리해요",
+    how2_b: "프로필 확인", how2: "검색어·연차·지역을 고치고 저장해요",
+    how3_b: "공고 받기", how3: "정한 간격마다 새 공고가 출력되고 점수가 매겨져요",
+    manual: "이력서 없이 직접 입력할게요", back: "돌아가기",
+    profile_h: "프로필", reupload: "이력서 다시 올리기",
+    f_headline: "한 줄 소개", f_summary: "경력 요약", f_years: "경력 (년)", f_seniority: "현재 연차",
+    sen_intern: "인턴", sen_entry: "신입", sen_mid: "주니어~미들", sen_senior: "시니어", sen_staff: "스태프 이상",
+    f_target: "희망 연차", f_target_opt: "LinkedIn 검색 필터 · 여러 개 선택",
+    ts_intern: "인턴", ts_entry: "신입", ts_associate: "주니어", ts_mid_senior: "미들·시니어", ts_director: "디렉터+", ts_director_title: "디렉터 · 임원",
+    f_skills: "기술", opt_comma: "쉼표로 구분", f_roles: "희망 직무", opt_roles: "쉼표로 구분 · 필수",
+    f_locations: "희망 근무지", f_languages: "언어", sub_search: "LinkedIn 검색",
+    f_queries: "검색어", opt_queries: "쉼표로 구분 · 최대 3개", ph_queries: "예: Backend Engineer, AI Engineer",
+    f_location: "검색 지역", ph_location: "예: Seoul, South Korea", f_remote: "근무 형태",
+    rm_any: "상관없음", rm_remote: "원격", rm_hybrid: "하이브리드", rm_onsite: "출근", save: "프로필 저장",
+    watch_h: "자동 수집", watch_label: "{every}마다 새 공고 찾기", watch_quiet: "새벽 1~7시는 쉽니다",
+    f_every: "검색 간격", every_opt: "{every}마다", next_search: "다음 검색",
+    how_summary: "수집은 어떻게 하나요?",
+    how_body: `<ol>
+      <li><b>새 공고 검색</b> · {every}마다, LinkedIn에서 검색어로 새 공고를 찾아 '찾은 공고'에 바로 출력해요. 평가가 밀려 있어도 검색은 멈추지 않아요.</li>
+      <li><b>적합도 평가</b> · Jev가 제목을 보고 읽어볼 만한 공고를 고르면, 8~14분마다 5개씩 본문을 읽고 적합도를 매겨요.</li>
+      <li><b>쉬는 시간</b> · 실행 사이에 몇 분씩 쉬고, 새벽 1~7시는 쉬어요.</li></ol>
+      <p>간격과 쉬는 시간은 매번 <b>랜덤</b>이에요. LinkedIn은 요청이 짧은 시간에 몰리면 잠시 막기 때문에, 사람이 보는 것처럼 천천히 나눠서 가져와요. 막히면 알아서 더 오래 쉬었다가 이어서 해요.</p>
+      <p>이 창을 닫아도 서버에서 계속 수집하고, 다시 들어오면 그동안 찾은 공고가 쌓여 있어요.</p>`,
+    filter_ph: "제목, 회사, 지역으로 거르기", q_all: "모든 검색어", export: "Excel 다운로드",
+    undo: "되돌리기", tour_skip: "건너뛰기", tour_prev: "이전", tour_next: "다음", tour_done: "시작하기",
+    rail_next: "다음 출력", rail_queue: "평가 대기열", rail_views: "보기",
+    view_all: "전체", view_scored: "평가됨", view_strong: "잘 맞음", view_wait: "평가 예정",
+    rail_every: "{every}마다 · 새벽 1~7시 휴식", rail_off: "자동 수집이 꺼져 있어요. 프로필 탭에서 켤 수 있어요.",
+    rail_queue_sub: "5건씩 약 12분마다 · 다음 {t}", rail_queue_idle: "평가할 공고가 없어요",
+    live_on: "다음 {t}", live_off: "자동 수집 꺼짐", live_run: "출력 중",
+    cut: "{t} 출력 · 새 공고 {n}", total: "합계 {total}건 · 평가 {scored}", strong_count: "잘 맞음 {n}",
+    open_li: "LinkedIn에서 열기", sub_none: "프로필을 저장하면 검색이 시작돼요",
+    who: "{name} 님", up_steps: ["이력서를 올리는 중", "경력과 기술을 읽는 중", "희망 직무를 정리하는 중", "LinkedIn 검색어를 고르는 중", "거의 다 됐습니다"],
+    up_done: "프로필이 준비됐습니다", only_pdf: "PDF 파일만 올릴 수 있습니다.",
+    no_reader: "지금은 이력서 자동 읽기를 쓸 수 없습니다. 프로필을 직접 입력해 주세요.",
+    manual_msg: "내용을 채우고 '프로필 저장'을 누르세요.",
+    filled: "AI가 프로필을 채우고 저장했습니다. 확인하고 고칠 부분이 있으면 고친 뒤 다시 저장하세요.",
+    need_role: "희망 직무를 하나 이상 입력해 주세요.", saved: "저장했습니다.",
+    running_now: "지금 실행 중", queued_soon: "곧 실행",
+    last_search: "마지막 검색 <b>{at}</b> · 새 공고 <b>{n}</b>", never_run: "아직 실행한 적이 없습니다.",
+    stopped_err: "지난 실행이 중간에 멈췄습니다: {e}",
+    btn_running: "찾는 중…", btn_queued: "곧 시작합니다", btn_wait: "{t}부터 다시 찾을 수 있어요", run_now: "지금 한 번 찾기",
+    hint_running: "지금 LinkedIn에서 찾는 중이에요.", hint_queued: "차례를 기다리는 중이에요. 곧 시작해요.",
+    hint_wait: "방금 검색했어요. LinkedIn이 막지 않도록 검색 사이에 10분은 쉬어요. {t}부터 다시 누를 수 있어요.",
+    bar_queued: "차례를 기다리는 중입니다. 곧 찾기 시작합니다", bar_default: "공고를 찾는 중입니다",
+    watch_on: "자동 수집을 켰습니다. 첫 실행은 곧 시작됩니다.", watch_off: "자동 수집을 껐습니다.",
+    every_set: "검색 간격을 {every}로 바꿨습니다.", run_ok: "찾는 대로 '찾은 공고'에 바로 출력됩니다.",
+    fit_aria: "적합도 {p}%, 항목별 점수 보기", eval_now: "평가 중", eval_at: "{t}쯤 평가", eval_soon: "평가 예정",
+    eval_paused: "수집 꺼짐", eval_skip: "평가 안 함",
+    why_queued: "5개씩 약 12분마다 평가해요. 새 공고 검색이 끼면 조금 늦어질 수 있어요.",
+    why_paused: "자동 수집을 켜면 차례로 평가해요.",
+    why_skip: "Jev가 제목만 보고 맞지 않는다고 판단해 본문을 읽지 않았거나, 평가 대기열에서 밀린 공고입니다.",
+    parts: ["역할", "기술", "연차", "지역"], tip_h: "Jev 항목별 점수", overall: "종합",
+    tip_note: "종합은 평균이 아니라 \"지원할 만한가\"에 대한 Jev의 판단입니다.", tip_note_li: " 회사 지원 페이지 대신 LinkedIn 공고 설명으로 평가했습니다.",
+    apply: "회사 지원", remove: "목록에서 지우기",
+    empty_filter: "조건에 맞는 공고가 없어요", empty_filter_sub: "보기나 검색어를 바꿔 보세요.",
+    empty_none: "아직 출력된 공고가 없어요", empty_none_sub: "프로필을 저장하고 '지금 한 번 찾기'를 눌러 보세요.",
+    removed: "'{t}'를 지웠습니다", job: "공고",
+    st_search: "LinkedIn에서 찾는 중: {q}", st_triage: "Jev가 공고 {n}개의 제목을 평가하는 중", st_read: "공고 읽고 적합도 평가 중 ({i}/{n}): {t}",
+    st_wall: "LinkedIn이 잠시 막아서 천천히 진행합니다", st_new: "LinkedIn에서 새 공고를 찾는 중입니다", st_queue: "대기 중인 공고를 읽는 중입니다",
+    st_found: "발견: {t} · {c}",
+    done_err: "중간에 멈췄습니다. 그때까지 찾은 것은 저장했습니다.",
+    done_read: "공고 {n}개를 읽고 평가했습니다", done_left: " · {n}개 남음",
+    done_search: "검색 완료: 새 공고 {n}개", done_queue: " · {n}개는 차례로 평가합니다",
+    tour_main: [
+      ["Shortlist에 오신 걸 환영해요", "이력서 한 장만 올리면 AI가 프로필을 만들고, Shortlist가 LinkedIn에서 맞는 공고를 알아서 찾아 목록에 출력해 둬요."],
+      ["여기에 이력서를 놓으세요", "PDF를 끌어다 놓거나 눌러서 고르면 돼요. 읽는 동안 진행 막대가 움직이고, 다 읽으면 프로필이 나타나요. 이름·연락처는 저장하지 않아요."],
+      ["내 프로필", "AI가 채운 프로필은 이 탭에 있어요. 희망 직무와 검색어를 확인하고 고쳐서 저장하세요."],
+      ["찾은 공고", "검색할 때마다 새 공고가 영수증처럼 맨 위에 출력돼요. 점수에 마우스를 올리면 항목별 점수가, 필요 없는 공고는 ×로 지울 수 있어요."],
+      ["언제든 다시 보기", "이 ? 버튼을 누르면 이 안내를 다시 볼 수 있어요. 옆에서 언어도 바꿀 수 있어요."],
+    ],
+    tour_profile: [
+      ["AI가 채운 프로필이에요", "내용이 맞는지 확인하고, 고칠 부분은 고친 뒤 '프로필 저장'을 누르세요."],
+      ["희망 연차", "지원하고 싶은 연차를 고르세요. LinkedIn에서 그 연차 공고만 찾고, Jev도 이 기준으로 연차가 맞는지 평가해요. 아무것도 안 고르면 모든 연차를 찾아요."],
+      ["검색어와 지역", "LinkedIn에서 이 검색어(최대 3개)와 지역으로 공고를 찾아요. 찾은 공고마다 어떤 검색어로 찾았는지 표시돼요."],
+      ["자동 수집 켜기", "켜 두면 정한 간격마다 LinkedIn에서 새 공고만 골라서 찾아요. 공고가 너무 많이 쌓이면 검색 간격을 늘려 보세요."],
+      ["천천히, 랜덤 간격으로", "검색·평가 간격과 그 사이 쉬는 시간은 매번 랜덤이에요. LinkedIn은 요청이 몰리면 잠시 막아서, 사람처럼 나눠서 가져와요. 새벽 1~7시는 쉬고, 창을 닫아도 서버에서 계속 수집해요. 반짝이는 '수집은 어떻게 하나요?'를 지금 눌러서 펼쳐 보세요."],
+      ["지금 바로 찾기", "기다리기 싫으면 눌러서 바로 한 번 찾아요. 찾는 동안 위에 진행 상황이 뜨고, '찾은 공고'에 한 줄씩 출력돼요."],
+      ["찾은 공고", "결과는 이 탭에 쌓여요. 필요 없는 공고는 ×로 지우고, Excel로 내려받을 수도 있어요."],
+    ],
+  },
+  en: {
+    tab_profile: "My profile", tab_results: "Jobs found", help_title: "Show the guide again", help_label: "Help",
+    ms_next: "next print", ms_run: "Search now",
+    mock_banner: "Test mode: fit scores come from keyword rules, not a real evaluation.",
+    hero_title: "One resume, and matching jobs keep piling up",
+    hero_lead: "AI reads your resume and builds a profile. Shortlist then finds new LinkedIn jobs on its own and prints them to your list, even with this page closed, while Jev scores how well each one fits.",
+    drop_title: "Drop your resume PDF here", drop_sub: "or click to choose a file · your name and contact details are never stored",
+    how1_b: "Drop your resume", how1: "AI sums up your experience, skills and target roles",
+    how2_b: "Check your profile", how2: "Adjust search terms, level and location, then save",
+    how3_b: "Get jobs", how3: "New jobs print on your schedule and get scored",
+    manual: "I'll fill it in myself", back: "Back",
+    profile_h: "Profile", reupload: "Upload a new resume",
+    f_headline: "Headline", f_summary: "Summary", f_years: "Experience (yrs)", f_seniority: "Current level",
+    sen_intern: "Intern", sen_entry: "Entry", sen_mid: "Junior–mid", sen_senior: "Senior", sen_staff: "Staff+",
+    f_target: "Target level", f_target_opt: "LinkedIn filter · pick any",
+    ts_intern: "Intern", ts_entry: "Entry", ts_associate: "Associate", ts_mid_senior: "Mid-Senior", ts_director: "Director+", ts_director_title: "Director · Executive",
+    f_skills: "Skills", opt_comma: "comma-separated", f_roles: "Target roles", opt_roles: "comma-separated · required",
+    f_locations: "Preferred locations", f_languages: "Languages", sub_search: "LinkedIn search",
+    f_queries: "Search terms", opt_queries: "comma-separated · up to 3", ph_queries: "e.g. Backend Engineer, AI Engineer",
+    f_location: "Search location", ph_location: "e.g. Toronto, Ontario, Canada", f_remote: "Work type",
+    rm_any: "Any", rm_remote: "Remote", rm_hybrid: "Hybrid", rm_onsite: "On-site", save: "Save profile",
+    watch_h: "Auto search", watch_label: "Find new jobs {every}", watch_quiet: "Pauses from 1 to 7 a.m.",
+    f_every: "Search interval", every_opt: "{Every}", next_search: "Next search",
+    how_summary: "How does it collect jobs?",
+    how_body: `<ol>
+      <li><b>New-job search</b> · {every}, it searches LinkedIn with your terms and prints new jobs straight to 'Jobs found'. Searching never waits for scoring.</li>
+      <li><b>Fit scoring</b> · Jev picks the jobs worth reading from their titles, then reads 5 postings every 8–14 minutes and scores their fit.</li>
+      <li><b>Rest</b> · It rests a few minutes between runs and pauses from 1 to 7 a.m.</li></ol>
+      <p>Intervals and rests are <b>random</b> every time. LinkedIn briefly blocks bursts of requests, so jobs are fetched slowly, the way a person would browse. If it gets blocked, it rests longer and carries on.</p>
+      <p>It keeps collecting on the server after you close this page; your jobs will be waiting when you come back.</p>`,
+    filter_ph: "Filter by title, company, location", q_all: "All search terms", export: "Download Excel",
+    undo: "Undo", tour_skip: "Skip", tour_prev: "Back", tour_next: "Next", tour_done: "Get started",
+    rail_next: "Next print", rail_queue: "Scoring queue", rail_views: "View",
+    view_all: "All", view_scored: "Scored", view_strong: "Strong fit", view_wait: "To score",
+    rail_every: "{every} · pauses 1–7 a.m.", rail_off: "Auto search is off. Turn it on in My profile.",
+    rail_queue_sub: "5 at a time about every 12 min · next {t}", rail_queue_idle: "Nothing waiting to be scored",
+    live_on: "next {t}", live_off: "Auto search off", live_run: "printing",
+    cut: "Printed {t} · {n} new", total: "Total {total} · {scored} scored", strong_count: "{n} strong fit",
+    open_li: "Open on LinkedIn", sub_none: "Save your profile to start searching",
+    who: "{name}", up_steps: ["Uploading your resume", "Reading experience and skills", "Working out target roles", "Choosing LinkedIn search terms", "Almost done"],
+    up_done: "Your profile is ready", only_pdf: "Only PDF files can be uploaded.",
+    no_reader: "Resume reading is not available right now. Please fill in the profile yourself.",
+    manual_msg: "Fill it in, then press 'Save profile'.",
+    filled: "AI filled in and saved your profile. Check it, fix anything that's off, and save again.",
+    need_role: "Enter at least one target role.", saved: "Saved.",
+    running_now: "Running now", queued_soon: "Starting soon",
+    last_search: "Last search <b>{at}</b> · new jobs <b>{n}</b>", never_run: "Hasn't run yet.",
+    stopped_err: "The last run stopped partway: {e}",
+    btn_running: "Searching…", btn_queued: "Starting soon", btn_wait: "You can search again at {t}", run_now: "Search now",
+    hint_running: "Searching LinkedIn right now.", hint_queued: "Waiting for its turn; it starts soon.",
+    hint_wait: "You just searched. Searches rest 10 minutes apart so LinkedIn doesn't block them. You can press this again at {t}.",
+    bar_queued: "Waiting for its turn; the search starts soon", bar_default: "Looking for jobs",
+    watch_on: "Auto search is on. The first run starts soon.", watch_off: "Auto search is off.",
+    every_set: "Searches now run {every}.", run_ok: "New jobs print to 'Jobs found' as they're found.",
+    fit_aria: "Fit {p}%, show the breakdown", eval_now: "Scoring", eval_at: "Scored ~{t}", eval_soon: "Will be scored",
+    eval_paused: "Auto search off", eval_skip: "Not scored",
+    why_queued: "Jobs are scored 5 at a time about every 12 minutes. A new-job search in between can delay it a little.",
+    why_paused: "Turn auto search on and these get scored in turn.",
+    why_skip: "Either Jev judged from the title alone that it doesn't fit, so the posting wasn't read, or it was pushed out of the scoring queue.",
+    parts: ["Role", "Skills", "Level", "Location"], tip_h: "Jev's scores", overall: "Overall",
+    tip_note: "Overall is not an average: it is Jev's call on whether to apply.", tip_note_li: " Scored from LinkedIn's description, not the company's apply page.",
+    apply: "Apply on site", remove: "Remove from the list",
+    empty_filter: "No jobs match", empty_filter_sub: "Try another view or search term.",
+    empty_none: "Nothing printed yet", empty_none_sub: "Save your profile and press 'Search now'.",
+    removed: "Removed '{t}'", job: "the job",
+    st_search: "Searching LinkedIn: {q}", st_triage: "Jev is reading {n} job titles", st_read: "Reading and scoring ({i}/{n}): {t}",
+    st_wall: "LinkedIn is limiting us for a moment; slowing down", st_new: "Searching LinkedIn for new jobs", st_queue: "Reading queued postings",
+    st_found: "Found: {t} · {c}",
+    done_err: "Stopped partway. Everything found so far is saved.",
+    done_read: "Read and scored {n} jobs", done_left: " · {n} left",
+    done_search: "Search done: {n} new jobs", done_queue: " · {n} will be scored in turn",
+    tour_main: [
+      ["Welcome to Shortlist", "Upload your resume once. AI builds your profile, and Shortlist keeps finding matching LinkedIn jobs and printing them to your list."],
+      ["Drop your resume here", "Drag a PDF here or click to choose one. A bar shows progress while it's read, then your profile appears. Your name and contact details are never stored."],
+      ["My profile", "The profile AI filled in lives in this tab. Check the target roles and search terms, fix them, and save."],
+      ["Jobs found", "Every search prints its new jobs at the top, like a receipt. Hover a score for its breakdown, and remove any job you don't want with ×."],
+      ["See this again anytime", "Press this ? button to see the guide again. You can switch the language right next to it."],
+    ],
+    tour_profile: [
+      ["Your AI-filled profile", "Check that it's right, fix anything that's off, then press 'Save profile'."],
+      ["Target level", "Pick the levels you want to apply at. LinkedIn only returns jobs at those levels, and Jev judges seniority against them. Pick none to see every level."],
+      ["Search terms and location", "LinkedIn is searched with these terms (up to 3) and this location. Every job shows which term found it."],
+      ["Turn on auto search", "While it's on, new jobs are found on your chosen interval. If too many pile up, pick a longer interval."],
+      ["Slow, random timing", "Search and scoring intervals and the rests between them are random each time. LinkedIn blocks bursts, so jobs are fetched slowly, like a person browsing. It pauses 1–7 a.m. and keeps running on the server after you close this page. Click the glowing 'How does it collect jobs?' to open it now."],
+      ["Search right now", "Don't want to wait? Press this to search once now. Progress shows at the top and jobs print to 'Jobs found' line by line."],
+      ["Jobs found", "Results collect in this tab. Remove the ones you don't want with ×, or download them as Excel."],
+    ],
+  },
+};
+let LANG = (() => {
+  try { const v = localStorage.getItem("jjh.lang"); if (v === "ko" || v === "en") return v; } catch {}
+  return (navigator.language || "").toLowerCase().startsWith("ko") ? "ko" : "en";
+})();
+const t = (key, vars = {}) => {
+  const s = STR[LANG][key] ?? STR.ko[key] ?? key;
+  if (typeof s !== "string") return s;
+  return s.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : `{${k}}`));
+};
+const everyText = (key) => (EVERY[key] || EVERY["30-60"])[LANG];
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.cookie = `jjh_lang=${LANG}; path=/; max-age=31536000; samesite=lax`;  // server messages follow
+  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll("[data-i18n-ph]")) el.placeholder = t(el.dataset.i18nPh);
+  for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = t(el.dataset.i18nTitle);
+  for (const el of document.querySelectorAll("[data-i18n-aria]")) el.setAttribute("aria-label", t(el.dataset.i18nAria));
+  for (const b of $("lang").children) b.setAttribute("aria-pressed", String(b.dataset.lang === LANG));
+  $("who").textContent = userName ? t("who", { name: userName }) : "";
+  const cur = watchState?.every || $("every").value || "30-60";
+  $("every").innerHTML = Object.keys(EVERY).map((k) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(LANG === "ko" ? t("every_opt", { every: everyText(k) }) : cap(everyText(k)))}</option>`).join("");
+  paintEvery(cur);
+  paintTapeHead();
+  if (watchState) showWatch(watchState);
+  render();
+  if (!$("tour").hidden) drawTour();
+}
+function paintEvery(key) {
+  $("watch-label").textContent = t("watch_label", { every: everyText(key) });
+  $("how-body").innerHTML = t("how_body", { every: LANG === "ko" ? everyText(key) : cap(everyText(key)) });
+}
+$("lang").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-lang]");
+  if (!b || b.dataset.lang === LANG) return;
+  LANG = b.dataset.lang;
+  try { localStorage.setItem("jjh.lang", LANG); } catch {}
+  applyLang();
+});
 
 const list = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
 const join = (a) => (a || []).join(", ");
-const pct = (v) => (typeof v === "number" ? Math.round(v * 100) + "%" : "");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const locale = () => (LANG === "ko" ? "ko-KR" : "en-US");
+const asDate = (iso) => new Date(String(iso).replace(" ", "T"));
 const when = (iso) => {
   if (!iso) return "-";
-  const d = new Date(iso.replace(" ", "T"));
-  return isNaN(d) ? iso : d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const d = asDate(iso);
+  return isNaN(d) ? iso : d.toLocaleString(locale(), { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
+const clock = (iso) => {
+  if (!iso) return "--:--";
+  const d = asDate(iso);
+  return isNaN(d) ? iso : d.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit", hour12: false });
+};
+const day = (iso) => { const d = asDate(iso); return isNaN(d) ? "" : d.toLocaleDateString(locale(), { month: "short", day: "numeric" }); };
 function msg(id, text, kind) { const el = $(id); el.textContent = text || ""; el.className = "msg" + (kind ? " " + kind : ""); }
+const store = {  // per-browser flags only (tour seen); the page works the same without storage
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const ICON = {
+  out: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
+  x: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>',
+  q: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+};
 
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   const j = await r.json().catch(() => ({}));
-  if (r.status === 401) { location.reload(); throw new Error(j.error || "로그인이 필요합니다"); }
+  if (r.status === 401) { location.reload(); throw new Error(j.error || "401"); }
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 }
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+
+/* ---------- tabs ---------- */
+function showTab(name) {
+  for (const tb of document.querySelectorAll(".tab")) tb.setAttribute("aria-selected", String(tb.dataset.tab === name));
+  $("view-profile").hidden = name !== "profile";
+  $("view-results").hidden = name !== "results";
+}
+for (const tb of document.querySelectorAll(".tab")) tb.addEventListener("click", () => showTab(tb.dataset.tab));
+
+/* ---------- profile screens ---------- */
+function showOnboard(reupload = false) {
+  $("onboard").hidden = false; $("profile-area").hidden = true;
+  $("drop").hidden = !reader; $("upload").hidden = true; $("how").hidden = reupload;
+  document.querySelector(".slot .tear").hidden = !reader;
+  $("manual").hidden = reupload; $("cancel-reupload").hidden = !reupload;
+  msg("drop-msg", reader ? "" : t("no_reader"));
+}
+function showProfile() {
+  $("onboard").hidden = true; $("profile-area").hidden = false;
+  $("reupload").hidden = !reader;
+}
+$("manual").addEventListener("click", () => { showProfile(); msg("profile-msg", t("manual_msg")); });
+$("reupload").addEventListener("click", () => showOnboard(true));
+$("cancel-reupload").addEventListener("click", showProfile);
 
 function fill(p) {
   if (!p) return;
   const c = p.candidate || {}, s = p.search || {};
+  profileSearch = s;
   $("headline").value = c.headline || ""; $("summary").value = c.summary || "";
   $("years").value = c.years_experience ?? ""; $("seniority").value = c.seniority || "mid";
   $("skills").value = join(c.skills); $("roles").value = join(c.target_roles);
   $("locations").value = join(c.locations); $("languages").value = join(c.languages);
   $("queries").value = join(s.queries); $("location").value = s.location || ""; $("remote").value = s.remote || "any";
   fill.keep = { interests: c.interests || [], education: c.education || "" };
+  const want = new Set(c.target_seniority || []);
+  for (const b of $("target-sen").children) b.setAttribute("aria-pressed", String(want.has(b.dataset.v)));
+  paintTapeHead();
 }
-
+function paintTapeHead() {
+  const s = profileSearch;
+  $("tape-sub").textContent = s && (s.queries || []).length
+    ? [s.location, (s.queries || []).join(" / ")].filter(Boolean).join(" · ").toUpperCase()
+    : t("sub_none");
+}
+$("target-sen").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (b) b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+});
 function read() {
   const cand = {
     headline: $("headline").value.trim(), summary: $("summary").value.trim(),
     years_experience: parseFloat($("years").value) || 0, seniority: $("seniority").value,
     skills: list($("skills").value), target_roles: list($("roles").value),
     locations: list($("locations").value), languages: list($("languages").value),
+    target_seniority: [...$("target-sen").children].filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.dataset.v),
     ...(fill.keep || {}),
   };
   return { candidate: cand, search: { queries: list($("queries").value).slice(0, maxQueries),
     location: $("location").value.trim(), remote: $("remote").value, posted: "week" } };
 }
 
+/* resume upload with a progress bar; the server answers once, so the bar eases toward 92% meanwhile */
+const STEP_AT = [0, 3, 12, 22, 40];
+function progress(name) {
+  $("drop").hidden = true; document.querySelector(".slot .tear").hidden = true; $("how").hidden = true; $("manual").hidden = true; $("cancel-reupload").hidden = true;
+  $("upload").hidden = false; $("up-name").textContent = name; msg("drop-msg", "");
+  const fillEl = $("up-fill");
+  const t0 = performance.now();
+  const set = (p, step) => { fillEl.style.width = p + "%"; $("up-pct").textContent = Math.round(p) + "%"; if (step) $("up-step").textContent = step; };
+  const tick = () => { const s = (performance.now() - t0) / 1000;
+    set(92 * (1 - Math.exp(-s / 16)), t("up_steps")[STEP_AT.filter((a) => s >= a).length - 1]); };
+  tick(); const timer = setInterval(tick, 200);
+  return {
+    done() { clearInterval(timer); set(100, t("up_done")); },
+    fail() { clearInterval(timer); },
+  };
+}
 async function upload(file) {
   if (!file) return;
-  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { msg("profile-msg", "PDF 파일만 올릴 수 있습니다.", "err"); return; }
-  msg("profile-msg", `${file.name}을(를) 읽는 중입니다. 1분 정도 걸릴 수 있습니다.`);
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { msg("drop-msg", t("only_pdf"), "err"); return; }
+  const reupload = hasProfile, bar = progress(file.name);
   try {
     const j = await api("/api/resume", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
-    fill(j.profile);
-    msg("profile-msg", "프로필을 채우고 저장했습니다. 내용을 확인하고 고칠 부분이 있으면 고친 뒤 다시 저장하세요.", "ok");
-  } catch (e) { msg("profile-msg", e.message, "err"); }
+    bar.done();
+    await new Promise((r) => setTimeout(r, 600));
+    fill(j.profile); hasProfile = true; showProfile();
+    msg("profile-msg", t("filled"), "ok");
+    if (!reupload && !store.get("jjh.tour.profile")) setTimeout(() => startTour("profile", "jjh.tour.profile"), 450);
+  } catch (e) {
+    bar.fail(); showOnboard(reupload); msg("drop-msg", e.message, "err");
+  }
+  $("file").value = "";
 }
 const drop = $("drop");
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files[0]); });
 $("file").addEventListener("change", (e) => upload(e.target.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());  // a missed drop must not open the PDF in the tab
+window.addEventListener("drop", (e) => e.preventDefault());
 
 $("save").addEventListener("click", async () => {
   const p = read();
-  if (!p.candidate.target_roles.length) { msg("profile-msg", "희망 직무를 하나 이상 입력해 주세요.", "err"); return; }
-  try { fill((await api("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) })).profile);
-        msg("profile-msg", "저장했습니다.", "ok"); }
+  if (!p.candidate.target_roles.length) { msg("profile-msg", t("need_role"), "err"); return; }
+  try { fill((await post("/api/profile", p)).profile); hasProfile = true; msg("profile-msg", t("saved"), "ok"); }
   catch (e) { msg("profile-msg", e.message, "err"); }
 });
 
-function showWatch(w) {
-  $("watch").checked = !!w.enabled;
-  $("next").textContent = w.running ? "지금 실행 중" : w.queued ? "곧 실행 (대기 중)" : when(w.next_run);
-  const last = w.last;
-  $("last").textContent = last ? when(last.at) : "없음";
-  $("last-result").innerHTML = last ? (last.error ? `<span style="color:var(--bad)">${esc(last.error)}</span>`
-    : `새 공고 <b>${last.new}</b> · 평가 <b>${last.scored}</b> · 잘 맞음 <b>${last.strong}</b>`
-      + (last.pending ? ` · 다음에 읽을 공고 <b>${last.pending}</b>` : "")) : "";
-  $("run-now").disabled = !!(w.running || w.queued);
+/* ---------- watch ---------- */
+function setRunning(on, text) {
+  $("runbar").hidden = !on;
+  if (text) $("live").textContent = text;
+  else if (on && !$("live").textContent) $("live").textContent = t("bar_default");
 }
-
+function paintRun(btn, wrap, w) {  // "search now" lives in two places: the profile's watch card and the rail
+  const until = w.run_now_at && clock(w.run_now_at);
+  btn.disabled = !!(w.running || w.queued || w.run_now_at);
+  btn.textContent = w.running ? t("btn_running") : w.queued ? t("btn_queued") : until ? t("btn_wait", { t: until }) : t("run_now");
+  const hint = w.running ? t("hint_running") : w.queued ? t("hint_queued") : until ? t("hint_wait", { t: until }) : "";
+  if (hint) wrap.dataset.hint = hint; else delete wrap.dataset.hint;
+}
+function showWatch(w) {
+  watchState = w;
+  $("watch").checked = !!w.enabled;
+  if ($("every").value !== w.every) $("every").value = w.every;
+  paintEvery(w.every);
+  $("next").textContent = w.running ? t("running_now") : w.queued ? t("queued_soon") : clock(w.next_run);
+  const last = w.last, any = w.last_any;
+  $("last-result").innerHTML = last ? t("last_search", { at: esc(when(last.at)), n: last.new })
+      + (any && any.error ? `<br><span style="color:var(--red-ink)">${esc(t("stopped_err", { e: any.error }))}</span>` : "")
+    : esc(t("never_run"));
+  paintRun($("run-now"), $("run-now-wrap"), w);
+  paintRun($("rail-run"), $("rail-run-wrap"), w);
+  $("ms-run").disabled = $("rail-run").disabled;
+  $("ms-run").textContent = w.running ? t("btn_running") : w.run_now_at ? clock(w.run_now_at) : t("ms_run");
+  $("ms-run").title = $("rail-run-wrap").dataset.hint || "";
+  $("ms-next").textContent = w.running ? "··:··" : w.enabled || w.queued ? clock(w.next_run) : "--:--";
+  $("ms-next-l").textContent = w.enabled || w.running ? t("ms_next") : t("live_off");
+  $("ms-queue").textContent = String(Math.min(w.pending || 0, QUEUE_CAP));
+  // top bar and rail
+  $("live-top").classList.toggle("off", !w.enabled && !w.running);
+  $("live-top-text").textContent = w.running ? t("live_run") : w.enabled ? t("live_on", { t: clock(w.next_run) }) : t("live_off");
+  $("rail-next").textContent = w.running ? "··:··" : w.enabled || w.queued ? clock(w.next_run) : "--:--";
+  $("rail-next-sub").textContent = w.enabled ? t("rail_every", { every: everyText(w.every) }) : t("rail_off");
+  const pending = Math.min(w.pending || 0, QUEUE_CAP);
+  $("rail-queue").firstChild.textContent = String(pending);
+  $("rail-slots").innerHTML = Array.from({ length: QUEUE_CAP }, (_, i) => `<i class="${i < pending ? "on" : ""}"></i>`).join("");
+  $("rail-queue-sub").textContent = pending ? t("rail_queue_sub", { t: w.next_read ? clock(w.next_read) : "--:--" }) : t("rail_queue_idle");
+  clearTimeout(showWatch.t);
+  if (w.run_now_at) showWatch.t = setTimeout(refresh, Math.max(1000, new Date(w.run_now_at) - Date.now() + 1500));
+  if (w.running) setRunning(true);
+  else if (w.queued) setRunning(true, t("bar_queued"));
+}
 $("watch").addEventListener("change", async (e) => {
-  try { showWatch(await api("/api/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) }));
-        msg("watch-msg", e.target.checked ? "자동 수집을 켰습니다. 첫 실행은 곧 시작됩니다." : "자동 수집을 껐습니다.", "ok"); }
+  try { showWatch(await post("/api/watch", { enabled: e.target.checked }));
+        msg("watch-msg", e.target.checked ? t("watch_on") : t("watch_off"), "ok"); }
   catch (err) { e.target.checked = !e.target.checked; msg("watch-msg", err.message, "err"); }
 });
-$("run-now").addEventListener("click", async () => {
-  try { showWatch(await api("/api/run-now", { method: "POST" })); msg("watch-msg", "차례가 되면 바로 찾기 시작합니다. 몇 분 걸릴 수 있습니다.", "ok"); }
-  catch (e) { msg("watch-msg", e.message, "err"); }
+$("every").addEventListener("change", async (e) => {
+  const key = e.target.value;
+  try { showWatch(await post("/api/watch", { every: key })); msg("watch-msg", t("every_set", { every: everyText(key) }), "ok"); }
+  catch (err) { msg("watch-msg", err.message, "err"); if (watchState) $("every").value = watchState.every; }
 });
+async function runNow(msgId) {
+  try { showWatch(await post("/api/run-now")); if (msgId) msg(msgId, t("run_ok"), "ok"); else toast(t("run_ok")); }
+  catch (e) { if (msgId) msg(msgId, e.message, "err"); else toast(e.message); }
+}
+$("run-now").addEventListener("click", () => runNow("watch-msg"));
+$("rail-run").addEventListener("click", () => runNow(null));
+$("ms-run").addEventListener("click", () => runNow(null));
 
-function row(r) {
-  const hi = typeof r.fit === "number" && r.fit >= 0.7, fresh = lastAt && r.first_seen === lastAt;
-  const links = [`<a href="${esc(r.href)}" target="_blank" rel="noopener">LinkedIn</a>`];
-  if (r.apply_url) links.push(`<a href="${esc(r.apply_url)}" target="_blank" rel="noopener">회사 지원</a>`);
-  return `<tr class="${hi ? "fit-hi" : ""}${fresh ? " fresh" : ""}">
-    <td><div class="title">${esc(r.title)} ${fresh ? '<span class="tag new">새로</span>' : ""}</div><div class="dim">${esc(r.level || "")} ${esc(r.posted_text || "")}</div></td>
-    <td>${esc(r.company)}</td><td>${esc(r.location)}</td>
-    <td class="num"><strong>${pct(r.fit)}</strong></td>
-    <td class="num dim">${esc(when(r.first_seen))}</td><td>${links.join(" · ")}</td></tr>`;
+/* ---------- results: the tape ---------- */
+const pct = (v) => Math.round(v * 100);
+const isScored = (r) => typeof r.fit === "number";
+const VIEWS = {
+  all: () => true,
+  scored: isScored,
+  strong: (r) => isScored(r) && r.fit >= 0.7,
+  wait: (r) => !isScored(r) && !!r.eval && ["queued", "reading", "paused"].includes(r.eval.state),
+};
+function scoreCell(r) {
+  if (!isScored(r)) return pending(r.eval);
+  const p = pct(r.fit), cls = p >= 70 ? "hi" : p < 45 ? "lo" : "";
+  return `<span class="score ${cls}" tabindex="0" data-tip="${esc(r.id)}" aria-label="${esc(t("fit_aria", { p }))}">${p}<small>%</small></span>`;
+}
+function pending(ev) {  // a job Jev hasn't scored yet: when it will, or why it won't (hover explains)
+  const st = ev && ev.state;
+  const span = (text, why) => `<span class="wait" tabindex="0" data-why="${esc(why)}">${esc(text)}</span>`;
+  if (st === "reading") return `<span class="wait now"><i></i>${esc(t("eval_now"))}</span>`;
+  if (st === "queued") return span(ev.at ? t("eval_at", { t: clock(ev.at) }) : t("eval_soon"), t("why_queued"));
+  if (st === "paused") return span(t("eval_paused"), t("why_paused"));
+  if (st === "skipped" || st === "dropped") return span(t("eval_skip"), t("why_skip"));
+  return '<span class="wait">-</span>';
+}
+const PARTS = ["role_match", "skills_match", "seniority_match", "location_match"];
+function placeTip(el) {
+  const tip = $("tip");
+  tip.hidden = false;
+  const a = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(Math.max(12, a.right - w), innerWidth - w - 12) + "px";
+  tip.style.top = (a.bottom + 8 + h < innerHeight ? a.bottom + 8 : a.top - 8 - h) + "px";
+}
+function showTip(el) {
+  const tip = $("tip");
+  if (el.dataset.why) { tip.className = "hint"; tip.textContent = el.dataset.why; return placeTip(el); }
+  const r = rows.find((x) => x.id === el.dataset.tip);
+  if (!r) return;
+  tip.className = "";
+  tip.innerHTML = `<h4>${esc(t("tip_h"))}</h4>` + PARTS.map((k, i) => [k, t("parts")[i]]).filter(([k]) => typeof r[k] === "number").map(([k, label]) => {
+    const p = pct(r[k]);
+    return `<div class="br"><small>${esc(label)}</small><span><i style="width:${p}%"></i></span><b>${p}</b></div>`;
+  }).join("") + `<div class="tot"><span>${esc(t("overall"))}</span><span>${pct(r.fit)}%</span></div>`
+    + `<div class="note">${esc(t("tip_note") + (r.source === "LinkedIn" ? t("tip_note_li") : ""))}</div>`;
+  placeTip(el);
+}
+const hideTip = () => { $("tip").hidden = true; };
+const tipTarget = (e) => e.target.closest("[data-tip], [data-why]");
+$("rows").addEventListener("mouseover", (e) => { const el = tipTarget(e); if (el) showTip(el); });
+$("rows").addEventListener("mouseout", (e) => { if (tipTarget(e)) hideTip(); });
+$("rows").addEventListener("focusin", (e) => { const el = tipTarget(e); if (el) showTip(el); });
+$("rows").addEventListener("focusout", hideTip);
+addEventListener("scroll", hideTip, { passive: true });
+function logo(r) {  // LinkedIn's company logo, printed in grayscale; initials when there is none or it fails
+  const initials = esc((String(r.company || "?").match(/[\p{L}\p{N}]/gu) || ["?"]).slice(0, 2).join("").toUpperCase());
+  const img = r.logo ? `<img src="${esc(r.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onload="this.parentNode.classList.add('img')" onerror="this.remove()">` : "";
+  return `<span class="logo" aria-hidden="true">${initials}${img}</span>`;
+}
+function line(r) {
+  const href = r.href || `https://www.linkedin.com/jobs/view/${encodeURIComponent(r.id)}`;
+  const arrive = !knownIds.has(r.id) && line.seeded;
+  const meta = [esc(r.company), esc(r.location), esc(r.posted_text || "")].filter(Boolean).join(" · ");
+  const apply = r.apply_url ? ` · <a href="${esc(r.apply_url)}" target="_blank" rel="noopener">${esc(t("apply"))}</a>` : "";
+  return `<div class="line${arrive ? " arrive" : ""}" data-id="${esc(r.id)}">
+    ${logo(r)}
+    <div class="txt"><div class="ttl">${esc(r.title)}</div><div class="meta"><span>${meta}${apply}</span>${r.query ? `<span class="q">${ICON.q}${esc(r.query)}</span>` : ""}</div></div>
+    <div class="sc">${scoreCell(r)}</div>
+    <div class="acts"><a class="act" href="${esc(href)}" target="_blank" rel="noopener" aria-label="${esc(t("open_li"))}" title="${esc(t("open_li"))}">${ICON.out}</a><button type="button" class="act x" data-x="${esc(r.id)}" aria-label="${esc(t("remove"))}" title="${esc(t("remove"))}">${ICON.x}</button></div>
+  </div>`;
 }
 function render() {
-  const q = $("filter").value.trim().toLowerCase(), onlyScored = $("only-scored").checked;
-  let shown = rows.filter((r) => (!onlyScored || typeof r.fit === "number")
+  const q = $("filter").value.trim().toLowerCase(), qf = $("qfilter").value;
+  const shown = rows.filter((r) => VIEWS[view](r) && (!qf || r.query === qf)
     && (!q || `${r.title} ${r.company} ${r.location}`.toLowerCase().includes(q)));
-  if (onlyScored) shown = shown.sort((a, b) => b.fit - a.fit);
-  $("rows").innerHTML = shown.length ? shown.map(row).join("")
-    : `<tr><td colspan="6" class="empty">${rows.length ? "조건에 맞는 공고가 없습니다." : "아직 찾은 공고가 없습니다. 프로필을 저장하고 자동 수집을 켜 보세요."}</td></tr>`;
+  const ranked = view === "strong" || view === "scored";
+  if (ranked) shown.sort((a, b) => b.fit - a.fit);
+  let html = "";
+  if (!shown.length) {
+    html = `<div class="empty"><b>${esc(rows.length ? t("empty_filter") : t("empty_none"))}</b>${esc(rows.length ? t("empty_filter_sub") : t("empty_none_sub"))}</div>`;
+  } else if (ranked) {
+    html = shown.map(line).join("");
+  } else {  // the tape: one print block per search, newest first
+    const groups = [];
+    for (const r of shown) {
+      const g = groups[groups.length - 1];
+      if (g && g.at === r.first_seen) g.rows.push(r); else groups.push({ at: r.first_seen, rows: [r] });
+    }
+    const newest = rows.reduce((m, r) => (r.first_seen > m ? r.first_seen : m), "");
+    html = groups.map((g) => `<div class="cut${g.at === newest ? " latest" : ""}">${esc(day(g.at))} · ${esc(t("cut", { t: clock(g.at), n: g.rows.length }))}</div>` + g.rows.map(line).join("")).join("");
+  }
+  $("rows").innerHTML = html;
+  for (const r of rows) knownIds.add(r.id);
+  line.seeded = true;
+  const scored = rows.filter(isScored).length, strong = rows.filter(VIEWS.strong).length;
   $("export").disabled = !rows.length;
+  $("badge").textContent = rows.length || "";
+  $("vc-all").textContent = rows.length; $("vc-scored").textContent = scored;
+  $("vc-strong").textContent = strong; $("vc-wait").textContent = rows.filter(VIEWS.wait).length;
+  $("total").hidden = !rows.length;
+  $("count").textContent = t("total", { total: render.total ?? rows.length, scored });
+  $("strong-count").textContent = t("strong_count", { n: strong });
+  const queries = [...new Set(rows.map((r) => r.query).filter(Boolean))];
+  const sel = $("qfilter"), cur = sel.value;
+  sel.innerHTML = `<option value="">${esc(t("q_all"))}</option>` + queries.map((x) => `<option${x === cur ? " selected" : ""}>${esc(x)}</option>`).join("");
 }
 $("filter").addEventListener("input", render);
-$("only-scored").addEventListener("change", render);
+$("qfilter").addEventListener("change", render);
+$("views").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]");
+  if (!b) return;
+  view = b.dataset.view;
+  for (const v of $("views").children) v.setAttribute("aria-pressed", String(v === b));
+  render();
+});
 $("export").addEventListener("click", () => { location = "/api/export.xlsx"; });
 
-async function refresh() {
-  const [s, res] = await Promise.all([api("/api/state"), api("/api/results")]);
-  showWatch(s.watch);
-  rows = res.rows; lastAt = res.last_at;
-  $("count").textContent = res.total ? `전체 ${res.total}개 · 평가 ${res.scored}개${res.total > res.rows.length ? ` (최근 ${res.rows.length}개 표시)` : ""}` : "";
+let toastTimer = null;
+function toast(text, undo) {
+  $("toast-text").textContent = text;
+  $("toast-undo").hidden = !undo; $("toast-undo").onclick = undo ? () => { undo(); $("toast").classList.remove("show"); } : null;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("show"), 5000);
+}
+$("rows").addEventListener("click", async (e) => {
+  const id = e.target.closest("[data-x]")?.dataset.x;
+  if (!id) return;
+  const el = e.target.closest(".line"), gone = rows.find((r) => r.id === id);
+  el.classList.add("leaving");
+  try {
+    await post("/api/dismiss", { ids: [id] });
+    setTimeout(() => { rows = rows.filter((r) => r.id !== id); render.total = Math.max(0, (render.total ?? 1) - 1); render(); }, 220);
+    toast(t("removed", { t: gone?.title || t("job") }), async () => { await post("/api/dismiss", { ids: [id], undo: true }); refreshResults(); });
+  } catch (err) { el.classList.remove("leaving"); toast(err.message); }
+});
+
+async function refreshResults() {
+  const res = await api("/api/results");
+  rows = res.rows; render.total = res.total;
   render();
+}
+let soon = null;
+const refreshSoon = () => { clearTimeout(soon); soon = setTimeout(refreshResults, 700); };
+async function refresh() {
+  const [s] = await Promise.all([api("/api/state"), refreshResults()]);
+  showWatch(s.watch);
   return s;
 }
 
+/* ---------- live progress (SSE) ---------- */
+function status(m) {  // the server reports progress in English; shown in the page's language
+  let x;
+  if ((x = /^Searching LinkedIn: (.*)/.exec(m))) return t("st_search", { q: x[1] });
+  if ((x = /^Jev is triaging (\d+)/.exec(m))) return t("st_triage", { n: x[1] });
+  if ((x = /^Reading (\d+)\/(\d+): (.*)/.exec(m))) return t("st_read", { i: x[1], n: x[2], t: x[3] });
+  if (/login wall/.test(m)) return t("st_wall");
+  if (/^Searching LinkedIn for new jobs/.test(m)) return t("st_new");
+  if (/^Reading queued postings/.test(m)) return t("st_queue");
+  return m;
+}
 function listen() {
-  es = new EventSource("/api/events");
-  es.addEventListener("status", (e) => { $("live").textContent = JSON.parse(e.data).msg; });
-  es.addEventListener("search", (e) => { $("live").textContent = `검색 중: ${JSON.parse(e.data).query}`; });
-  es.addEventListener("card", (e) => { const c = JSON.parse(e.data); $("live").textContent = `발견: ${c.title} · ${c.company}`; });
-  es.addEventListener("fit", () => { $("live").textContent = "공고를 읽고 적합도를 평가하는 중입니다"; });
-  es.addEventListener("cycle", (e) => {
+  const es = new EventSource("/api/events");
+  es.addEventListener("status", (e) => setRunning(true, status(JSON.parse(e.data).msg)));
+  es.addEventListener("search", (e) => setRunning(true, t("st_search", { q: JSON.parse(e.data).query })));
+  es.addEventListener("card", (e) => { const c = JSON.parse(e.data); setRunning(true, t("st_found", { t: c.title, c: c.company })); refreshSoon(); });
+  es.addEventListener("triage", refreshSoon);
+  es.addEventListener("fit", refreshSoon);
+  es.addEventListener("cycle", async (e) => {
     const d = JSON.parse(e.data);
-    $("live").textContent = d.error ? "" : `완료: 새 공고 ${d.new}개, 평가 ${d.scored}개`;
+    setRunning(false);
+    toast(d.error ? t("done_err")
+      : d.kind === "read" ? t("done_read", { n: d.scored }) + (d.pending ? t("done_left", { n: d.pending }) : "")
+      : t("done_search", { n: d.new }) + (d.pending ? t("done_queue", { n: d.pending }) : ""));
     refresh();
   });
 }
 
+/* ---------- guided tour ---------- */
+// steps point at elements; the words come from STR[LANG].tour_main / tour_profile, in the same order
+const TOUR_SEL = {
+  main: [null, "#drop", "#tab-profile", "#tab-results", "#help"],
+  profile: ["#profile-card", "#target-sen-field", "#search-fields", "#watch-toggle", "#how-collect", "#run-now", "#tab-results"],
+};
+const CLICK_STEP = "#how-collect";
+const tour = { steps: [], i: 0, key: null };
+const visible = (el) => el && el.offsetParent !== null && el.getClientRects().length;
+function tourSteps(which) {
+  const pick = (name, i) => ({ sel: TOUR_SEL[name][i], name, i });
+  if (which === "main") return TOUR_SEL.main.map((_, i) => pick("main", i)).slice(1);  // the screen itself is the welcome
+  if (which === "profile") return TOUR_SEL.profile.map((_, i) => pick("profile", i));
+  return [...TOUR_SEL.profile.map((_, i) => pick("profile", i)), pick("main", 4)];  // "both"
+}
+function startTour(which, key) {
+  tour.steps = tourSteps(which).filter((s) => !s.sel || visible(document.querySelector(s.sel)));
+  if (!tour.steps.length) return;
+  tour.i = 0; tour.key = key;
+  $("tour").hidden = false;
+  document.documentElement.classList.add("locked");  // the page holds still; steps scroll it for you
+  drawTour();
+}
+function endTour() {
+  $("tour").hidden = true;
+  document.documentElement.classList.remove("locked");
+  if (tour.key) store.set(tour.key, "1");
+}
+function drawTour() {
+  const s = tour.steps[tour.i], n = tour.steps.length;
+  const [title, body] = t(s.name === "main" ? "tour_main" : "tour_profile")[s.i];
+  $("tour-title").textContent = title; $("tour-body").textContent = body;
+  $("tour-dots").innerHTML = tour.steps.map((_, k) => `<i class="${k === tour.i ? "on" : ""}"></i>`).join("");
+  $("tour-prev").hidden = tour.i === 0;
+  $("tour-next").textContent = tour.i === n - 1 ? t("tour_done") : t("tour_next");
+  $("tour-skip").hidden = tour.i === n - 1;
+  $("tour").classList.toggle("clickable", s.sel === CLICK_STEP);
+  $("tour").classList.add("moving");  // glide between steps; follow scrolling without lag
+  clearTimeout(drawTour.t); drawTour.t = setTimeout(() => $("tour").classList.remove("moving"), 350);
+  placeTour(true);
+}
+function placeTour(bringIntoView = false) {
+  if ($("tour").hidden) return;
+  const s = tour.steps[tour.i], hole = $("tour-hole"), pop = $("tour-pop");
+  const el = s.sel && document.querySelector(s.sel);
+  const vw = innerWidth, vh = innerHeight, pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 14, m = 12, pad = 8;
+  if (!el) {  // centered intro card over a dimmed page
+    $("tour").classList.remove("spot"); hole.hidden = true;
+    pop.style.left = (vw - pw) / 2 + "px"; pop.style.top = Math.max(m, (vh - ph) / 2.4) + "px";
+    return;
+  }
+  $("tour").classList.add("spot"); hole.hidden = false;
+  const headH = document.querySelector(".top").offsetHeight;
+  let r = el.getBoundingClientRect();
+  if (bringIntoView && (r.top < headH + m || r.bottom > vh - m)) {
+    el.scrollIntoView({ block: r.height > vh - headH - ph ? "start" : "center" });
+    r = el.getBoundingClientRect();
+  }
+  // the visible part of the target, below the sticky header
+  let top = Math.max(r.top - pad, headH + 6), bottom = Math.min(r.bottom + pad, vh - 6);
+  const left = r.left - pad, right = r.right + pad;
+  // the card goes beside the highlight, never on it: below, above, right, left; if nothing fits
+  // (a target taller than the screen), the highlight is trimmed to leave room underneath
+  let px, py;
+  const midX = Math.min(Math.max(m, (left + right) / 2 - pw / 2), vw - pw - m);
+  const midY = Math.min(Math.max(headH + m, (top + bottom) / 2 - ph / 2), vh - ph - m);
+  if (bottom + gap + ph <= vh - m) { px = midX; py = bottom + gap; }
+  else if (top - gap - ph >= headH + m) { px = midX; py = top - gap - ph; }
+  else if (right + gap + pw <= vw - m) { px = right + gap; py = midY; }
+  else if (left - gap - pw >= m) { px = left - gap - pw; py = midY; }
+  else { bottom = Math.max(top + 40, vh - m - ph - gap); px = midX; py = bottom + gap; }
+  if (bottom <= top) top = bottom;  // scrolled fully out of view: the highlight collapses
+  Object.assign(hole.style, { left: left + "px", top: top + "px", width: right - left + "px", height: Math.max(0, bottom - top) + "px" });
+  pop.style.left = px + "px"; pop.style.top = py + "px";
+}
+$("tour-next").addEventListener("click", () => { if (tour.i < tour.steps.length - 1) { tour.i++; drawTour(); } else endTour(); });
+$("tour-prev").addEventListener("click", () => { if (tour.i > 0) { tour.i--; drawTour(); } });
+$("tour-skip").addEventListener("click", endTour);
+// on the clickable step, a click inside the highlight goes to the element under it (e.g. open the details)
+$("tour").addEventListener("click", (e) => {
+  const s = tour.steps[tour.i];
+  if (!s || s.sel !== CLICK_STEP || e.target.closest("#tour-pop")) return;
+  const h = $("tour-hole").getBoundingClientRect();
+  if (e.clientX < h.left || e.clientX > h.right || e.clientY < h.top || e.clientY > h.bottom) return;
+  $("tour").style.pointerEvents = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  $("tour").style.pointerEvents = "";
+  if (under) under.click();
+});
+$("how-collect").addEventListener("toggle", () => placeTour());  // the highlight grows with the details
+addEventListener("resize", () => placeTour());
+addEventListener("scroll", () => placeTour(), { passive: true });
+// belt and braces for the scroll lock: touch and wheel over the guide never reach the page
+for (const ev of ["wheel", "touchmove"]) $("tour").addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+addEventListener("keydown", (e) => {
+  if ($("tour").hidden) return;
+  if (e.key === "Escape") endTour();
+  if (e.key === "ArrowRight" || e.key === "Enter") $("tour-next").click();
+  if (e.key === "ArrowLeft") $("tour-prev").click();
+});
+$("help").addEventListener("click", () => {
+  if (!$("view-profile").hidden && hasProfile && !$("profile-area").hidden) startTour("profile", null);
+  else { showTab("profile"); startTour("main", null); }
+});
+
+/* ---------- start ---------- */
 (async () => {
+  applyLang();
   const s = await refresh();
-  $("who").textContent = `${s.user} 님`;
+  userName = s.user;
   maxQueries = s.max_queries || 3;
+  reader = !!s.reader;
   $("mock-banner").hidden = s.jev;
-  if (s.profile) fill(s.profile); else msg("profile-msg", "먼저 이력서를 올리거나 프로필을 직접 입력해 주세요.");
-  if (!s.reader) { $("drop").style.display = "none"; msg("profile-msg", "지금은 이력서 자동 읽기를 쓸 수 없습니다. 프로필을 직접 입력해 주세요."); }
+  hasProfile = !!s.profile;
+  if (hasProfile) { fill(s.profile); showProfile(); showTab("results"); } else { showOnboard(); showTab("profile"); }
+  applyLang();
   listen();
+  if (!store.get("jjh.tour.main")) {
+    if (hasProfile) store.set("jjh.tour.profile", "1");  // the main tour already covers the profile
+    setTimeout(() => { if (hasProfile) showTab("profile"); startTour(hasProfile ? "both" : "main", "jjh.tour.main"); }, 350);
+  }
 })();
 </script>
 </body>
