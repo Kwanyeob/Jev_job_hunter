@@ -1,4 +1,4 @@
-> **Status (2026-10-16):** phases 1–2 done on branch `friends-service`; phase 3 (deploy) postponed.
+> **Status (2026-10-19):** all three phases done. Phases 1–2 merged 2026-10-18; phase 3 deployed to Fly.io (`shortlist-kj`, Toronto) 2026-10-19, see `docs/OPERATIONS.md`.
 > Changes from this plan:
 > - The stdlib `jjh web` is kept for local single-user use, and the service is a new `server.py` instead of a rewrite.
 > - Reads are capped at 5 per cycle, and a `pending` queue carries the rest (added after a live cycle hit three 429s).
