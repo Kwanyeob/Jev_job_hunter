@@ -208,6 +208,19 @@ def cmd_users(root: Path, ns) -> None:
         print(f"  {u.name:<20} {u.id}  since {u.created}{'  REVOKED' if u.revoked else ''}")
 
 
+def cmd_usage(root: Path, ns) -> None:
+    from jev_job_hunter.usage import summarize, table
+    from jev_job_hunter.users import Users
+    data_dir = _data_dir(root)
+    rows = summarize(data_dir, Users(data_dir), days=ns.days)
+    if not rows:
+        print("(no users — create one with: jjh invite <name>)")
+        return
+    print(f"  Usage {'in the last ' + str(ns.days) + ' days' if ns.days else 'since logging began'}"
+          " (Jev counts skip mock runs; Claude cost is about 50 KRW per resume)")
+    print(table(rows))
+
+
 def cmd_web(root: Path, ns) -> None:
     from jev_job_hunter.web import serve
     serve(root, port=ns.port, open_browser=not ns.no_browser)
@@ -295,6 +308,8 @@ def build_parser() -> argparse.ArgumentParser:
     rv.add_argument("name")
     rv.add_argument("--delete", action="store_true")
     sub.add_parser("users", help="list users")
+    sub.add_parser("usage", help="per-user visits, resumes, runs, Jev and LinkedIn use").add_argument(
+        "--days", type=int, default=None, help="only the last N days (default: everything logged)")
     w = sub.add_parser("web", help="local site: drop a resume, watch jobs stream in, download Excel")
     w.add_argument("--port", type=int, default=8765)
     w.add_argument("--no-browser", action="store_true")
@@ -309,7 +324,7 @@ def main(argv=None) -> None:
     root = load_env()
     {"start": cmd_start, "js": cmd_js, "step": cmd_step, "run": cmd_run,
      "report": cmd_report, "log": cmd_log, "linkedin": cmd_linkedin, "watch": cmd_watch, "web": cmd_web,
-     "serve": cmd_serve, "invite": cmd_invite, "revoke": cmd_revoke, "users": cmd_users}[ns.cmd](root, ns)
+     "serve": cmd_serve, "invite": cmd_invite, "revoke": cmd_revoke, "users": cmd_users, "usage": cmd_usage}[ns.cmd](root, ns)
 
 
 if __name__ == "__main__":

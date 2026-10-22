@@ -13,6 +13,7 @@ import random
 import re
 import sys
 import time
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -41,6 +42,7 @@ AUTHWALL_LIMIT = 2       # consecutive login walls before the hunt stops
 RATE_LIMIT_RETRIES = 2   # 429s per request before giving up
 RATE_LIMIT_BACKOFF = 60.0  # seconds; doubles per retry, jittered
 REQUEST_LOG: Path | None = None  # when set, one JSON line per LinkedIn request (to tune the pacing)
+REQUEST_USER: ContextVar[str | None] = ContextVar("REQUEST_USER", default=None)  # whose run, for that log
 _AUTHWALL = re.compile(r"/(authwall|login|checkpoint|signup|uas/)", re.I)
 # Without Accept, LinkedIn answers 429 even to a first request (docs/evidence/2026-10-12-*).
 HEADERS = {
@@ -252,6 +254,8 @@ def _log_request(url: str, status, t0: float) -> None:
     kind = "search" if url.startswith(GUEST_SEARCH) else "posting" if "/jobPosting/" in url else "page"
     line = {"ts": datetime.now().isoformat(timespec="seconds"), "kind": kind, "status": status,
             "ms": int((time.monotonic() - t0) * 1000)}
+    if REQUEST_USER.get():
+        line["user"] = REQUEST_USER.get()
     try:
         REQUEST_LOG.parent.mkdir(parents=True, exist_ok=True)
         with REQUEST_LOG.open("a", encoding="utf-8") as f:

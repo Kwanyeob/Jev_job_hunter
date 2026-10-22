@@ -217,3 +217,31 @@ def test_unscored_jobs_say_when_they_get_a_fit_or_why_not(svc, monkeypatch):
 
     a.post("/api/watch", json={"enabled": False})
     assert {r["eval"]["state"] for r in a.get("/api/results").json()["rows"]} == {"paused", "skipped"}
+
+
+def test_usage_log_counts_each_users_activity(svc, monkeypatch, tmp_path_factory):
+    from jev_job_hunter import linkedin
+    from jev_job_hunter.usage import summarize, table
+
+    app, users, sched, data_dir, _ = svc
+    a, b = login(app, users, "A"), login(app, users, "B")
+    a.get("/"), a.get("/"), b.get("/")
+    assert a.post("/api/resume", content=b"not a pdf").status_code == 400
+    assert a.post("/api/resume", content=b"%PDF-1.7").status_code == 200
+    log = tmp_path_factory.mktemp("li") / "requests.jsonl"
+    monkeypatch.setattr(linkedin, "REQUEST_LOG", log)
+    with redirect_stdout(io.StringIO()):
+        sched.run_one(users.find("A").id)  # watch off: a one-off search reads its postings now
+    assert a.get("/api/export.xlsx").status_code == 200
+
+    rows = {r["name"]: r for r in summarize(data_dir, users)}
+    ra, rb = rows["A"], rows["B"]
+    assert (ra["logins"], ra["visits"], ra["resumes"], ra["resume_fails"], ra["exports"]) == (1, 2, 1, 1, 1)
+    assert ra["searches"] == 1 and ra["reads"] == 0 and ra["found"] == 3 and ra["claude_krw"] == 50
+    assert ra["jev_fits"] == 0  # the test scheduler runs mock Jev, which costs nothing
+    assert (rb["logins"], rb["visits"], rb["resumes"], rb["reads"]) == (1, 1, 0, 0)
+    assert "A" in table(list(rows.values()))
+    # the LinkedIn request log says whose run each request belonged to
+    lines = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
+    assert lines and all(x["user"] == users.find("A").id for x in lines)
+    assert summarize(data_dir, users, days=1, now=datetime(2030, 1, 1))[0]["visits"] == 0

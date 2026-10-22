@@ -21,6 +21,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.routing import Route
 
+from jev_job_hunter import usage
 from jev_job_hunter.profile import normalize_profile
 from jev_job_hunter.questions import LINKEDIN_OPEN_THRESHOLD
 from jev_job_hunter.scheduler import MAX_QUERIES, STATE_KEY, Hub, Scheduler
@@ -82,6 +83,7 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
         if user is None:
             return HTMLResponse(_page(L(request, "이 초대 링크는 유효하지 않습니다. 보낸 사람에게 새 링크를 요청해 주세요.",
                                         "This invite link is not valid. Ask the person who sent it for a new one.")), 403)
+        usage.record(data_dir, user.id, "login")
         resp = RedirectResponse("/", status_code=303)
         resp.set_cookie(COOKIE, make_session(key, user), max_age=SESSION_DAYS * 86400,
                         httponly=True, secure=secure, samesite="lax")
@@ -89,10 +91,11 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
 
     def home(request: Request):
         try:
-            user_of(request)
+            user = user_of(request)
         except HTTPException:
             return HTMLResponse(_page(L(request, "초대받은 사람만 쓸 수 있습니다. 받은 초대 링크로 접속해 주세요.",
                                         "This site is invite-only. Open it with the invite link you received.")), 401)
+        usage.record(data_dir, user.id, "visit")
         return HTMLResponse(APP_HTML.read_text(encoding="utf-8"), headers={"Cache-Control": "no-store"})
 
     def state(request: Request):
@@ -132,9 +135,12 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
         pdf = await request.body()
         try:
             raw = await run_in_threadpool(extract, pdf)
-            prof = _clean(normalize_profile(raw, "(resume)"))
         except ResumeError as e:
+            usage.record(data_dir, user.id, "resume", ok=False)
             return JSONResponse({"error": L(request, f"이력서를 읽지 못했습니다: {e}", f"Could not read the resume: {e}")}, 400)
+        usage.record(data_dir, user.id, "resume", ok=True)
+        try:
+            prof = _clean(normalize_profile(raw, "(resume)"))
         except SystemExit as e:
             return JSONResponse({"error": str(e).removeprefix("ERROR: ")}, 400)
         _save_profile(users.dir(user.id), prof)
@@ -223,6 +229,7 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
         scored_only = request.query_params.get("only") == "scored"  # Jev's matches, no All listings sheet
         path = write_state_xlsx(root, st, meta, scored_only=scored_only, listings_first=not scored_only)  # fresh, so knocked-out jobs are left out
         name = f"shortlist-{'scored-' if scored_only else ''}{date.today().isoformat()}.xlsx"
+        usage.record(data_dir, user.id, "export", only="scored" if scored_only else "all")
         return FileResponse(path, filename=name)
 
     async def http_error(request: Request, exc: HTTPException):

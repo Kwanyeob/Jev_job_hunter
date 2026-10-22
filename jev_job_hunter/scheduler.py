@@ -20,6 +20,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from jev_job_hunter import linkedin, usage
 from jev_job_hunter.profile import load_profile
 from jev_job_hunter.questions import LINKEDIN_DELAY
 from jev_job_hunter.users import Users
@@ -214,6 +215,7 @@ class Scheduler:
             max_open = 0 if kind == "search" and enabled else MAX_OPEN
             self.running, self.running_kind = uid, kind
             emit("status", {"msg": "Searching LinkedIn for new jobs" if queries else "Reading queued postings"})
+            tag = linkedin.REQUEST_USER.set(uid)
             try:
                 summary = run_cycle(root, state, prof, queries, search["location"],
                                     posted, search["remote"], max_open=max_open, delay=self.delay, mock=mock,
@@ -222,6 +224,9 @@ class Scheduler:
                 summary = {"error": f"{type(e).__name__}: {e}", "new": 0, "scored": 0}
             finally:
                 self.running = self.running_kind = None
+                linkedin.REQUEST_USER.reset(tag)
+            usage.record(self.users.data_dir, uid, "run", at=self.clock(), run=kind, mock=mock,
+                         **{k: summary.get(k) for k in ("new", "scored", "requests", "error")})
         now = self.clock()
         with self.lock:
             s = self.schedule(uid)

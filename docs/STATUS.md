@@ -20,6 +20,7 @@ The local server is **off**. The `data/` folder on the PC is an old copy; the li
 |---|---|---|
 | `jjh serve` | The service: invite login, per-user profile, auto search, results, Excel | Live on Fly.io since 2026-10-19 |
 | `jjh invite` / `revoke` / `users` | Operator commands; on the server run them with `fly ssh console -C "…"` | Used on the server |
+| `jjh usage [--days N]` | Per-user activity and API use from `/data/usage.jsonl` | Tests; not yet on the server |
 | `jjh linkedin` | `profile.yaml` → LinkedIn search → Jev triage → read top postings → Jev fit → Excel | Live 2026-10-12 with `--mock` Jev |
 | `jjh watch` | The same search every 30–60 min, unseen jobs only, one cumulative Excel | Live 2026-10-14 with `--mock` Jev |
 | `jjh web` | Local single-user page on `127.0.0.1:8765` | Tests only |
@@ -37,7 +38,8 @@ browser ──HTTPS──► Fly.io machine (always on, TZ America/Toronto)
 /data/users/<id>/config/profile.yaml
 /data/users/<id>/state/linkedin-watch.json, schedule.json, dismissed.json
 /data/users/<id>/results/linkedin-watch.xlsx (+ -scored.xlsx)
-/data/linkedin-requests.jsonl            every LinkedIn request, all users, with its status
+/data/linkedin-requests.jsonl            every LinkedIn request, all users, with its status and user
+/data/usage.jsonl                        logins, visits, resumes, runs, Excel downloads per user (counts only)
 ```
 
 **Login:** one secret invite link per person (only its hash is stored, shown once). Opening it sets an HMAC-signed, HttpOnly cookie for 90 days. Re-inviting a name replaces the link and logs out old sessions. Users can only reach their own folder.

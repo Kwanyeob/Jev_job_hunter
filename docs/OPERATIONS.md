@@ -49,6 +49,15 @@ fly ssh console --app shortlist-kj -C "jjh revoke NAME"          # block now, ke
 fly ssh console --app shortlist-kj -C "jjh revoke NAME --delete" # block and delete their folder
 ```
 
+## Usage
+
+```bash
+fly ssh console --app shortlist-kj -C "jjh usage"            # per user, since logging began
+fly ssh console --app shortlist-kj -C "jjh usage --days 7"   # the last week only
+```
+
+One row per user: last seen, page visits, resumes read (Claude, about 50 KRW each), search and read runs, jobs found, jobs Jev triaged and scored (mock runs excluded), LinkedIn requests, failed runs, Excel downloads. It is summed from `/data/usage.jsonl`, one line per event, which holds counts only, never profile or job content. Logging started with this feature, so earlier use isn't counted. Each line in `/data/linkedin-requests.jsonl` now also names the user whose run sent it.
+
 ## Logs and checks
 
 ```bash
