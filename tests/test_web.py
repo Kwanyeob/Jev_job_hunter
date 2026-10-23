@@ -54,6 +54,41 @@ def test_extract_profile_request_shape():
     assert "Today is" in text["text"]
 
 
+def test_extract_profile_career_goal():
+    client = FakeClient()
+    resume.extract_profile(b"%PDF-1.7", client=client)
+    plain = client.kw["messages"][0]["content"][1]["text"]
+    assert "Career goal from the candidate" not in plain and "adjacent_roles" in plain
+    fields = client.kw["output_config"]["format"]["schema"]["properties"]["candidate"]
+    assert {"career_goal", "transferable_skills", "adjacent_roles"} <= set(fields["required"])
+
+    resume.extract_profile(b"%PDF-1.7", goal="  PM/PO로\n전환 " + "x" * 500, client=client)
+    text = client.kw["messages"][0]["content"][1]["text"]
+    assert "Career goal from the candidate: PM/PO로 전환 x" in text and "x" * 301 not in text
+
+
+def test_retarget_profile_sends_no_pdf():
+    client = FakeClient()
+    got = resume.retarget_profile({**PROFILE, "path": "/data/users/x/profile.yaml"}, "Product Owner", client=client)
+    assert got == PROFILE
+    (only,) = client.kw["messages"][0]["content"]
+    assert only["type"] == "text"
+    assert "Career goal from the candidate: Product Owner" in only["text"]
+    assert '"Backend Engineer, 4 years Java"' in only["text"] and "/data/users" not in only["text"]
+
+
+def test_mock_fit_counts_transferable_skills():
+    from jev_job_hunter.jev import mock_fit
+    job = {"title": "Technical Product Manager", "location": "Seoul",
+           "text": "Own the roadmap, write specs, run A/B experiments with engineering and stakeholders."}
+    dev = {**PROFILE["candidate"], "target_roles": ["Technical Product Manager"]}
+    pivot = {**dev, "transferable_skills": ["Wrote specs with the PM team", "Ran A/B experiments",
+                                            "Planned the roadmap with stakeholders"]}
+    before = mock_fit({"candidate_profile": dev, "job": job})["skills_match"]
+    after = mock_fit({"candidate_profile": pivot, "job": job})["skills_match"]
+    assert after > before + 0.3
+
+
 def test_extract_profile_errors():
     with pytest.raises(resume.ResumeError, match="not a PDF"):
         resume.extract_profile(b"hello", client=FakeClient())

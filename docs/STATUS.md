@@ -67,6 +67,14 @@ browser ──HTTPS──► Fly.io machine (always on, TZ America/Toronto)
 - Profile steps: AI-filled profile, re-upload, auto search, random timing, search now. (Target level and search terms were dropped to keep it short.)
 - A "2 / 12" counter replaces the dots, which pushed Next out of the card on long guides. All guides were checked at 1366/1024/768/390 px in both languages with no overflow or overlap.
 
+**Career direction** (branch `career-direction`, 2026-10-22):
+- An optional "where you want to go" line on the upload screen (`POST /api/resume?goal=`, 300 chars). Free text: another field, a level, remote only, a place, or a mix. Claude applies each part it states and keeps the rest from the resume.
+- The profile stores it as `career_goal`, plus `transferable_skills` (on a change of field, with evidence) and `adjacent_roles` (0-3 other-field roles the resume supports; shown as suggestion chips, never searched unless picked).
+- `POST /api/goal` redoes a saved profile for a new direction without the PDF; `""` goes back to the resume's field. Logged as a `resume` usage event with `retarget`.
+- Jev's `skills_match`, `seniority_match` and `overall_fit` questions count `transferable_skills` and discount old-field years when `career_goal` is a change of field. Profiles without a goal score as before.
+- Form saves keep the three AI-only fields. Prompt examples span several fields so no one move biases every user.
+- Checked live: senior-only, remote-only, vague ("pays more"), two directions, licensed field (→ bridge roles), prompt injection (ignored), email in the text (not stored). Open: a direction set later sometimes picks one level lower (entry) than the same direction at upload.
+
 ## Deploy and operations
 
 - `Dockerfile` (python 3.14-slim + tzdata, `uv sync --frozen`), `fly.toml` (1 machine, never auto-stopped, `shared-cpu-1x` 512 MB, volume `shortlist_data` at `/data`, daily snapshots kept 5).

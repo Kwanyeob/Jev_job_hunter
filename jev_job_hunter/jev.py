@@ -239,6 +239,8 @@ def mock_fit(state: dict) -> dict[str, float]:
     role = 0.90 if any(w in title for w in roles) else 0.35
     skills = [str(s).lower() for s in prof.get("skills") or []]
     frac = sum(1 for s in skills if s in b) / max(1, len(skills))
+    if prof.get("transferable_skills"):  # changing field: evidence that carries over counts too
+        frac = max(frac, len(_words(prof["transferable_skills"]) & _words([b])) / 8)
     skill = 0.20 + 0.75 * min(1.0, frac * 2)
     yrs = float(prof.get("years_experience") or 0)
     need = [int(n) for n in re.findall(r"(\d{1,2})\+?\s*(?:years|yrs)", b)]

@@ -108,9 +108,13 @@ def open_card_instructions(i: int, title: str, company: str) -> str:
 
 FIT_NOULS = {
     "role_match": "Given `candidate_profile` and `job`, does this role match the candidate's target roles?",
-    "skills_match": "Given `candidate_profile` and `job`, does the candidate have most of the required skills and technologies?",
+    "skills_match": ("Given `candidate_profile` and `job`, does the candidate have most of the required skills and technologies? "
+                     "If `career_goal` is a move into a new field, count the experience in `transferable_skills` too."),
     "seniority_match": ("Given `candidate_profile` and `job`, does the job's experience level fit the candidate: their "
-                        "years of experience and seniority, and the levels in `target_seniority` they want to apply at?"),
+                        "years of experience and seniority, and the levels in `target_seniority` they want to apply at? "
+                        "If `career_goal` is a move into a new field, years in the old field count for less."),
     "location_match": "Given `candidate_profile` and `job`, is the job location or remote policy compatible with the candidate's locations?",
-    "overall_fit": "Given `candidate_profile` and `job`, should this candidate apply to this posting?",
+    "overall_fit": ("Given `candidate_profile` and `job`, should this candidate apply to this posting? "
+                    "If `career_goal` is a move into a new field, judge whether this employer would plausibly hire "
+                    "someone making that move (e.g. it values their background or hires at a junior level)."),
 }

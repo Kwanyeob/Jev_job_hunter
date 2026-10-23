@@ -198,6 +198,27 @@
   #drop .dim { color: var(--muted); font-size: 13.5px; }
   #drop input { display: none; }
   #upload { padding: 22px 24px; }
+  #goal-box { padding: 18px 22px 16px; margin-bottom: 10px; }
+  .goal-hint { margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+  /* career direction on the profile: set (dark bar + what carries over) or suggested (chips) */
+  .pivot { border: 1.5px solid var(--ink); border-radius: 3px; margin-bottom: calc(var(--gy) * 1.4); }
+  .pv-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; background: var(--ink); color: var(--tape); }
+  .pv-k { font: 700 12px/1 var(--mono); letter-spacing: .08em; color: #B9B8B2; }
+  .pv-bar b { font-size: 15px; }
+  .pv-bar .btn.line-btn { color: var(--tape); border-color: #5C5C57; }
+  .pv-bar .btn.line-btn:hover { color: var(--tape); border-color: var(--tape); }
+  .pv-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 14px; border-bottom: 1px dotted var(--rule); }
+  .pv-form input[type=text] { flex: 1 1 260px; width: auto; }
+  .pv-body { padding: 12px 14px 4px; }
+  .pv-body ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; counter-reset: pv; }
+  .pv-body li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; font-size: 13.5px; color: var(--ink-2); counter-increment: pv; }
+  .pv-body li::before { content: counter(pv, decimal-leading-zero); font: 700 12px/1.7 var(--mono); color: var(--faint); }
+  .pivot > .msg, .adj > .msg { margin: 0; padding: 0 14px 10px; }
+  .adj { border: 1.5px dashed var(--rule); border-radius: 3px; padding: 12px 14px 0; margin-bottom: calc(var(--gy) * 1.4); }
+  .adj .chips { margin-top: 8px; }
+  .adj .pv-form { padding: 10px 0 0; border: 0; }
+  .adj > .msg { padding: 0 0 10px; }
   .up-top { display: flex; justify-content: space-between; gap: 12px; font: 600 13px var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); margin-bottom: 10px; }
   .up-top b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .track { height: 8px; background: var(--rule-2); overflow: hidden; }
@@ -327,6 +348,11 @@
       </div>
       <div class="slot">
         <button class="btn line-btn back-btn" id="cancel-reupload" hidden data-i18n="back"></button>
+        <div class="paper" id="goal-box">
+          <label class="f" for="goal"><span data-i18n="goal_l"></span> <span class="opt" data-i18n="goal_opt"></span></label>
+          <input type="text" id="goal" maxlength="300" autocomplete="off" data-i18n-ph="goal_ph">
+          <div class="goal-hint" id="goal-hint"></div>
+        </div>
         <label id="drop" class="paper" for="file">
           <span class="well">
             <span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg></span>
@@ -351,6 +377,27 @@
     <div class="cols" id="profile-area" hidden>
       <section class="paper" id="profile-card">
         <div class="card-head"><h2 data-i18n="profile_h"></h2><span class="spacer"></span><button class="btn sm line-btn" id="reupload" data-i18n="reupload"></button></div>
+        <div class="pivot" id="pivot" hidden>
+          <div class="pv-bar"><span class="pv-k" data-i18n="pv_k"></span><b id="pv-goal"></b><span class="spacer"></span><button class="btn sm line-btn" id="pv-edit" aria-expanded="false" aria-controls="pv-form"></button></div>
+          <div class="pv-form" id="pv-form" hidden>
+            <label class="sr" for="pv-input" data-i18n="goal_l"></label>
+            <input type="text" id="pv-input" maxlength="300" autocomplete="off" data-i18n-ph="goal_ph">
+            <button class="btn sm" id="pv-apply" data-i18n="pv_apply"></button>
+            <button class="link-btn" id="pv-clear" data-i18n="pv_clear"></button>
+          </div>
+          <div class="pv-body" id="pv-body"><span class="f"><span data-i18n="pv_transfer"></span> <span class="opt" data-i18n="pv_transfer_opt"></span></span><ol id="pv-list"></ol></div>
+          <div class="msg" id="pv-msg"></div>
+        </div>
+        <div class="adj" id="adj" hidden>
+          <span class="f"><span data-i18n="adj_t"></span> <span class="opt" id="adj-sub"></span></span>
+          <div class="chips" id="adj-chips"></div>
+          <div class="pv-form" id="adj-form" hidden>
+            <label class="sr" for="adj-input" data-i18n="goal_l"></label>
+            <input type="text" id="adj-input" maxlength="300" autocomplete="off" data-i18n-ph="goal_ph">
+            <button class="btn sm" id="adj-apply" data-i18n="pv_apply"></button>
+          </div>
+          <div class="msg" id="adj-msg"></div>
+        </div>
         <div class="grid grow">
           <div class="s12"><label class="f" for="headline" data-i18n="f_headline"></label><input type="text" id="headline"></div>
           <div class="s12"><label class="f" for="summary" data-i18n="f_summary"></label><textarea id="summary" rows="3"></textarea></div>
@@ -488,6 +535,16 @@ const STR = {
     how2_b: "프로필 확인", how2: "검색어·연차·지역을 고치고 저장해요",
     how3_b: "공고 받기", how3: "정한 간격마다 새 공고가 출력되고 점수가 매겨져요",
     manual: "이력서 없이 직접 입력할게요", back: "← 내 프로필로 돌아가기",
+    goal_l: "원하는 방향", goal_opt: "선택", goal_ph: "예: ○○ 직무로 옮기고 싶어요 · 시니어로 지원할래요 · 원격만",
+    goal_hint_empty: "비워두면 이력서 경력 그대로 찾아요.",
+    goal_hint_set: "AI가 이 방향에 맞게 직무·레벨·검색어·근무 형태를 정해요. 다른 분야로 옮기면 옮겨 쓸 수 있는 경험도 찾아요.",
+    pv_k: "방향", pv_edit: "바꾸기", pv_close: "닫기", pv_apply: "AI로 다시 짜기", pv_clear: "이력서 분야로 돌아가기",
+    pv_transfer: "옮겨 쓸 수 있는 경험", pv_transfer_opt: "Jev가 점수를 매길 때 함께 봐요",
+    adj_t: "이런 쪽도 볼 수 있어요", adj_sub: "이력서에 근거가 있는 직무예요. 누르면 그 방향으로 프로필을 다시 짜요.",
+    adj_sub_none: "다른 직무, 레벨, 근무 형태 등 원하는 방향을 적으면 AI가 프로필을 다시 짜요.",
+    adj_own: "직접 적기", adj_goal: "{role} 쪽으로 옮기고 싶어요",
+    pv_busy: "AI가 프로필을 다시 짜고 있어요… (20초쯤)", pv_done: "새 방향으로 프로필을 다시 짰어요. 아래 검색 설정도 확인해 주세요.",
+    pv_back: "이력서 분야로 돌아왔어요.",
     profile_h: "프로필", reupload: "이력서 다시 올리기",
     f_headline: "한 줄 소개", f_summary: "경력 요약", f_years: "경력 (년)", f_seniority: "현재 연차",
     sen_intern: "인턴", sen_entry: "신입", sen_mid: "주니어~미들", sen_senior: "시니어", sen_staff: "스태프 이상",
@@ -589,6 +646,16 @@ const STR = {
     how2_b: "Check your profile", how2: "Adjust search terms, level and location, then save",
     how3_b: "Get jobs", how3: "New jobs print on your schedule and get scored",
     manual: "I'll fill it in myself", back: "← Back to my profile",
+    goal_l: "Where you want to go", goal_opt: "optional", goal_ph: "e.g. move into a ___ role · apply at senior level · remote only",
+    goal_hint_empty: "Leave it blank to search the field your resume is in.",
+    goal_hint_set: "AI sets roles, level, searches and work type for this direction. If you are changing field, it also finds the experience that carries over.",
+    pv_k: "DIRECTION", pv_edit: "Change", pv_close: "Close", pv_apply: "Redo with AI", pv_clear: "Back to my resume's field",
+    pv_transfer: "Experience that carries over", pv_transfer_opt: "Jev weighs it when scoring",
+    adj_t: "You could also look at", adj_sub: "Roles your resume gives evidence for. Pick one and AI redoes your profile for it.",
+    adj_sub_none: "Write the direction you want (another role, level, work type…) and AI redoes your profile.",
+    adj_own: "Write my own", adj_goal: "I want to move into {role}",
+    pv_busy: "AI is redoing your profile… (about 20 s)", pv_done: "Profile redone for the new direction. Check the search settings below too.",
+    pv_back: "Back to your resume's field.",
     profile_h: "Profile", reupload: "Upload a new resume",
     f_headline: "Headline", f_summary: "Summary", f_years: "Experience (yrs)", f_seniority: "Current level",
     sen_intern: "Intern", sen_entry: "Entry", sen_mid: "Junior–mid", sen_senior: "Senior", sen_staff: "Staff+",
@@ -704,6 +771,8 @@ function applyLang() {
   $("every").innerHTML = Object.keys(EVERY).map((k) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(LANG === "ko" ? t("every_opt", { every: everyText(k) }) : cap(everyText(k)))}</option>`).join("");
   paintEvery(cur);
   paintTapeHead();
+  paintGoalBox();
+  paintPivot();
   if (watchState) showWatch(watchState);
   render();
   if (!$("tour").hidden) drawTour();
@@ -770,6 +839,9 @@ function showOnboard(reupload = false) {
   $("drop").hidden = !reader; $("upload").hidden = true; $("how").hidden = reupload;
   document.querySelector(".slot .tear").hidden = !reader;
   $("manual").hidden = reupload; $("cancel-reupload").hidden = !reupload;
+  $("goal-box").hidden = !reader;
+  if (reupload) $("goal").value = (fill.keep && fill.keep.career_goal) || "";
+  paintGoalBox();
   msg("drop-msg", reader ? "" : t("no_reader"));
 }
 function showProfile() {
@@ -789,10 +861,74 @@ function fill(p) {
   $("skills").value = join(c.skills); $("roles").value = join(c.target_roles);
   $("locations").value = join(c.locations); $("languages").value = join(c.languages);
   $("queries").value = join(s.queries); $("location").value = s.location || ""; $("remote").value = s.remote || "any";
-  fill.keep = { interests: c.interests || [], education: c.education || "" };
+  fill.keep = { interests: c.interests || [], education: c.education || "", career_goal: c.career_goal || "",
+    transferable_skills: c.transferable_skills || [], adjacent_roles: c.adjacent_roles || [] };
   const want = new Set(c.target_seniority || []);
   for (const b of $("target-sen").children) b.setAttribute("aria-pressed", String(want.has(b.dataset.v)));
   paintTapeHead();
+  paintPivot();
+}
+
+/* career direction: typed on upload, or changed on the profile (POST /api/goal redoes the profile without the PDF) */
+function paintGoalBox() {
+  $("goal-hint").textContent = t($("goal").value.trim() ? "goal_hint_set" : "goal_hint_empty");
+}
+$("goal").addEventListener("input", paintGoalBox);
+function paintPivot() {
+  const k = fill.keep || {}, goal = k.career_goal || "";
+  $("pivot").hidden = !goal;
+  $("adj").hidden = !!goal || !reader;
+  $("pv-edit").hidden = !reader;
+  if (goal) {
+    $("pv-goal").textContent = goal;
+    $("pv-list").innerHTML = (k.transferable_skills || []).map((x) => `<li>${esc(x)}</li>`).join("");
+    $("pv-body").hidden = !(k.transferable_skills || []).length;
+    $("pv-edit").textContent = t($("pv-form").hidden ? "pv_edit" : "pv_close");
+  } else {
+    const roles = k.adjacent_roles || [];
+    $("adj-sub").textContent = t(roles.length ? "adj_sub" : "adj_sub_none");
+    $("adj-chips").innerHTML = roles.map((r, i) => `<button type="button" data-i="${i}">+ ${esc(r)}</button>`).join("")
+      + `<button type="button" data-own="1" aria-expanded="${!$("adj-form").hidden}">${esc(t("adj_own"))}</button>`;
+  }
+}
+async function retarget(goal, msgId) {
+  const busy = [$("pv-apply"), $("pv-clear"), $("adj-apply"), ...$("adj-chips").children];
+  busy.forEach((b) => { b.disabled = true; });
+  msg(msgId, t("pv_busy"));
+  try {
+    const j = await post("/api/goal", { goal });
+    $("pv-form").hidden = true; $("adj-form").hidden = true;
+    fill(j.profile);
+    msg(goal ? "pv-msg" : "adj-msg", t(goal ? "pv_done" : "pv_back"), "ok");
+    if (msgId !== (goal ? "pv-msg" : "adj-msg")) msg(msgId, "");
+  } catch (e) {
+    msg(msgId, e.message, "err");
+  }
+  busy.forEach((b) => { b.disabled = false; });
+}
+$("pv-edit").addEventListener("click", () => {
+  const open = $("pv-form").hidden;
+  $("pv-form").hidden = !open;
+  $("pv-edit").setAttribute("aria-expanded", String(open));
+  $("pv-edit").textContent = t(open ? "pv_close" : "pv_edit");
+  if (open) { $("pv-input").value = (fill.keep || {}).career_goal || ""; $("pv-input").focus(); }
+});
+$("pv-apply").addEventListener("click", () => { const g = $("pv-input").value.trim(); if (g) retarget(g, "pv-msg"); });
+$("pv-clear").addEventListener("click", () => retarget("", "pv-msg"));
+$("adj-chips").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.own) {
+    $("adj-form").hidden = !$("adj-form").hidden;
+    b.setAttribute("aria-expanded", String(!$("adj-form").hidden));
+    if (!$("adj-form").hidden) $("adj-input").focus();
+    return;
+  }
+  retarget(t("adj_goal", { role: (fill.keep.adjacent_roles || [])[+b.dataset.i] }), "adj-msg");
+});
+$("adj-apply").addEventListener("click", () => { const g = $("adj-input").value.trim(); if (g) retarget(g, "adj-msg"); });
+for (const id of ["pv-input", "adj-input"]) {
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") $(id === "pv-input" ? "pv-apply" : "adj-apply").click(); });
 }
 function paintTapeHead() {
   const s = profileSearch;
@@ -821,6 +957,7 @@ function read() {
 const STEP_AT = [0, 3, 12, 22, 40];
 function progress(name) {
   $("drop").hidden = true; document.querySelector(".slot .tear").hidden = true; $("how").hidden = true; $("manual").hidden = true; $("cancel-reupload").hidden = true;
+  $("goal-box").hidden = true;
   $("upload").hidden = false; $("up-name").textContent = name; msg("drop-msg", "");
   const fillEl = $("up-fill");
   const t0 = performance.now();
@@ -838,7 +975,9 @@ async function upload(file) {
   if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") { msg("drop-msg", t("only_pdf"), "err"); return; }
   const reupload = hasProfile, bar = progress(file.name);
   try {
-    const j = await api("/api/resume", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
+    const goal = $("goal").value.trim();
+    const j = await api("/api/resume" + (goal ? "?goal=" + encodeURIComponent(goal) : ""),
+                        { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
     bar.done();
     await new Promise((r) => setTimeout(r, 600));
     fill(j.profile); hasProfile = true; showProfile();
