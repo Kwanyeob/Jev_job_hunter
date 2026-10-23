@@ -33,6 +33,8 @@ COOKIE = "jjh_session"
 APP_HTML = Path(__file__).with_name("web") / "app.html"
 MAX_PDF = 20 * 1024 * 1024
 LISTINGS_SHOWN = 300
+# candidate fields only the AI fills (career change); a profile saved from the form keeps them
+AI_KEPT = ("career_goal", "transferable_skills", "adjacent_roles")
 PING_EVERY = 15  # seconds of silence before an SSE keep-alive comment
 
 
@@ -60,14 +62,16 @@ def _clean(prof: dict) -> dict:
 
 
 def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub | None = None,
-               extract=None, reader_ready=None, public_url: str = "", start_scheduler: bool = False) -> Starlette:
-    from jev_job_hunter.resume import ResumeError, extract_profile, has_credentials
+               extract=None, retarget=None, reader_ready=None, public_url: str = "",
+               start_scheduler: bool = False) -> Starlette:
+    from jev_job_hunter.resume import MAX_GOAL, ResumeError, extract_profile, has_credentials, retarget_profile
 
     users = Users(data_dir)
     key = secret_key(data_dir)
     hub = hub or Hub()
     scheduler = scheduler or Scheduler(users, hub)
     extract = extract or extract_profile
+    retarget = retarget or retarget_profile
     reader_ready = reader_ready or has_credentials
     secure = public_url.startswith("https://")
 
@@ -133,8 +137,9 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
             return JSONResponse({"error": L(request, "지금은 이력서 자동 읽기를 쓸 수 없습니다. 프로필을 직접 입력해 주세요.",
                                             "Resume reading is not available right now. Please fill in the profile yourself.")}, 503)
         pdf = await request.body()
+        goal = request.query_params.get("goal", "")[:MAX_GOAL]  # optional career change, e.g. "PM/PO"
         try:
-            raw = await run_in_threadpool(extract, pdf)
+            raw = await run_in_threadpool(extract, pdf, goal)
         except ResumeError as e:
             usage.record(data_dir, user.id, "resume", ok=False)
             return JSONResponse({"error": L(request, f"이력서를 읽지 못했습니다: {e}", f"Could not read the resume: {e}")}, 400)
@@ -149,11 +154,41 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
     async def profile(request: Request):
         user = user_of(request)
         try:
-            prof = _clean(normalize_profile(await request.json(), "(web)"))
-        except json.JSONDecodeError:
+            body = await request.json()
+            saved = (_load_saved(users.dir(user.id)) or {}).get("candidate") or {}
+            cand = body.get("candidate") or {}
+            body["candidate"] = {**{k: saved[k] for k in AI_KEPT if k in saved}, **cand}
+            prof = _clean(normalize_profile(body, "(web)"))
+        except (json.JSONDecodeError, AttributeError):
             return JSONResponse({"error": L(request, "잘못된 요청입니다.", "Bad request.")}, 400)
         except SystemExit:
             return JSONResponse({"error": L(request, "희망 직무를 하나 이상 입력해 주세요.", "Enter at least one target role.")}, 400)
+        _save_profile(users.dir(user.id), prof)
+        return JSONResponse({"profile": prof})
+
+    async def goal(request: Request):
+        """{"goal": "PM/PO로 전환"} rewrites the saved profile for that career move ("" goes back) without the PDF."""
+        user = user_of(request)
+        saved = _load_saved(users.dir(user.id))
+        if saved is None:
+            return JSONResponse({"error": L(request, "먼저 프로필을 저장해 주세요.", "Save your profile first.")}, 400)
+        if not reader_ready():
+            return JSONResponse({"error": L(request, "지금은 AI로 프로필을 고칠 수 없습니다. 직접 수정해 주세요.",
+                                            "AI profile editing is not available right now. Please edit it yourself.")}, 503)
+        try:
+            text = str((await request.json()).get("goal") or "")[:MAX_GOAL]
+        except (json.JSONDecodeError, AttributeError):
+            return JSONResponse({"error": L(request, "잘못된 요청입니다.", "Bad request.")}, 400)
+        try:
+            raw = await run_in_threadpool(retarget, saved, text)
+        except ResumeError as e:
+            usage.record(data_dir, user.id, "resume", ok=False, retarget=True)
+            return JSONResponse({"error": L(request, f"프로필을 고치지 못했습니다: {e}", f"Could not update the profile: {e}")}, 400)
+        usage.record(data_dir, user.id, "resume", ok=True, retarget=True)
+        try:
+            prof = _clean(normalize_profile(raw, "(goal)"))
+        except SystemExit as e:
+            return JSONResponse({"error": str(e).removeprefix("ERROR: ")}, 400)
         _save_profile(users.dir(user.id), prof)
         return JSONResponse({"profile": prof})
 
@@ -246,6 +281,7 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
         Route("/", home), Route("/invite/{token}", invite),
         Route("/api/state", state), Route("/api/results", results),
         Route("/api/resume", resume, methods=["POST"]), Route("/api/profile", profile, methods=["POST"]),
+        Route("/api/goal", goal, methods=["POST"]),
         Route("/api/watch", watch, methods=["POST"]), Route("/api/run-now", run_now, methods=["POST"]),
         Route("/api/dismiss", dismiss, methods=["POST"]),
         Route("/api/events", events), Route("/api/export.xlsx", export),

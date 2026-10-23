@@ -37,15 +37,31 @@ def svc(tmp_path, monkeypatch):
     sched = Scheduler(users, hub, mock=True, clock=lambda: datetime(2026, 10, 16, 10, 0), quiet=None,
                       client_factory=lambda: fake_client(FakeLinkedIn()), delay=0, pause=lambda s: None,
                       rng=random.Random(1))
-    calls = {"extract": 0, "reader": True}
+    calls = {"extract": 0, "reader": True, "goal": None, "retarget": []}
 
-    def extract(pdf: bytes) -> dict:
+    def extract(pdf: bytes, goal: str = "") -> dict:
         calls["extract"] += 1
+        calls["goal"] = goal
         if not pdf.startswith(b"%PDF"):
             raise ResumeError("not a PDF file")
         return json.loads(json.dumps(PROFILE))
 
-    app = create_app(tmp_path, scheduler=sched, hub=hub, extract=extract, reader_ready=lambda: calls["reader"])
+    def retarget(prof: dict, goal: str) -> dict:
+        calls["retarget"].append((json.loads(json.dumps(prof)), goal))
+        if goal == "boom":
+            raise ResumeError("rate limit")
+        out = json.loads(json.dumps(prof))
+        if goal:
+            out["candidate"].update(career_goal="Move into product management", target_roles=["Technical Product Manager"],
+                                    transferable_skills=["Wrote specs with PMs"])
+            out["search"]["queries"] = ["Technical Product Manager", "Product Owner"]
+        else:
+            out["candidate"].pop("career_goal", None)
+            out["candidate"]["transferable_skills"] = []
+        return out
+
+    app = create_app(tmp_path, scheduler=sched, hub=hub, extract=extract, retarget=retarget,
+                     reader_ready=lambda: calls["reader"])
     return app, users, sched, tmp_path, calls
 
 
@@ -109,6 +125,48 @@ def test_profile_save_validates(svc):
     assert client.post("/api/profile", content=b"{nope", headers={"Content-Type": "application/json"}).status_code == 400
     ok = client.post("/api/profile", json=PROFILE)
     assert ok.status_code == 200 and len(ok.json()["profile"]["search"]["queries"]) == 3
+
+
+def test_resume_passes_career_goal(svc):
+    app, users, sched, data_dir, calls = svc
+    client = login(app, users, "Minsu")
+    client.post("/api/resume", content=b"%PDF-1.7", headers={"Content-Type": "application/pdf"})
+    assert calls["goal"] == ""
+    client.post("/api/resume", params={"goal": "PM/PO로 전환 " + "x" * 1000}, content=b"%PDF-1.7",
+                headers={"Content-Type": "application/pdf"})
+    assert calls["goal"].startswith("PM/PO로 전환") and len(calls["goal"]) == 300
+
+
+def test_goal_retargets_saved_profile_and_form_saves_keep_it(svc):
+    app, users, sched, data_dir, calls = svc
+    client = login(app, users, "Minsu")
+    assert client.post("/api/goal", json={"goal": "PM"}).status_code == 400  # no profile yet
+    client.post("/api/profile", json=PROFILE)
+
+    r = client.post("/api/goal", json={"goal": "PM/PO로 전환하고 싶어요"})
+    assert r.status_code == 200
+    cand = r.json()["profile"]["candidate"]
+    assert cand["target_roles"] == ["Technical Product Manager"] and cand["career_goal"]
+    assert r.json()["profile"]["search"]["queries"] == ["Technical Product Manager", "Product Owner"]
+    sent, goal = calls["retarget"][-1]
+    assert goal == "PM/PO로 전환하고 싶어요" and "email" not in sent["candidate"]  # the saved, cleaned profile
+
+    # the form doesn't know the AI-only fields; saving it must not wipe them
+    form = {"candidate": {**PROFILE["candidate"], "target_roles": ["Product Owner"]}, "search": PROFILE["search"]}
+    kept = client.post("/api/profile", json=form).json()["profile"]["candidate"]
+    assert kept["target_roles"] == ["Product Owner"]
+    assert kept["career_goal"] == "Move into product management" and kept["transferable_skills"] == ["Wrote specs with PMs"]
+    assert client.get("/api/state").json()["profile"]["candidate"]["career_goal"]
+
+    back = client.post("/api/goal", json={"goal": ""}).json()["profile"]["candidate"]  # empty goal: back to the old field
+    assert "career_goal" not in back and "transferable_skills" not in back
+
+    assert client.post("/api/goal", json={"goal": "boom"}).status_code == 400
+    assert client.post("/api/goal", content=b"[1]", headers={"Content-Type": "application/json"}).status_code == 400
+    calls["reader"] = False
+    assert client.post("/api/goal", json={"goal": "PM"}).status_code == 503
+    kinds = [json.loads(line) for line in (data_dir / "usage.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert sum(1 for e in kinds if e.get("retarget")) == 3  # two ok, one failed: each a Claude call
 
 
 def test_watch_controls_and_isolation(svc):

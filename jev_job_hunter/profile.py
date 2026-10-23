@@ -37,7 +37,7 @@ def _strs(v) -> list[str]:
 def normalize_profile(data: dict, source: str) -> dict:
     """{candidate, search} → PII stripped, list fields cleaned, search defaults filled."""
     cand = {k: v for k, v in (data.get("candidate") or {}).items() if k not in PII_KEYS and v not in (None, "", [])}
-    for k in ("skills", "target_roles", "interests", "locations", "languages"):
+    for k in ("skills", "target_roles", "interests", "locations", "languages", "transferable_skills", "adjacent_roles"):
         if k in cand:
             cand[k] = _strs(cand[k])
     if "target_seniority" in cand:
