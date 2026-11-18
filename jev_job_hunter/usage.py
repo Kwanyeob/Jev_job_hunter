@@ -41,6 +41,15 @@ def events(data_dir: Path, since: datetime | None = None) -> list[dict]:
     return out
 
 
+ACTIVE_KINDS = ("login", "visit", "resume", "export")  # events that mean the person was here
+
+
+def last_seen(data_dir: Path, uid: str) -> datetime | None:
+    """When this user last opened the app (or did anything in it), from the log."""
+    seen = [e["ts"] for e in events(data_dir) if e.get("user") == uid and e.get("kind") in ACTIVE_KINDS]
+    return datetime.fromisoformat(max(seen)) if seen else None
+
+
 def summarize(data_dir: Path, users, days: int | None = None, now: datetime | None = None) -> list[dict]:
     """One row per user (revoked ones too), most recently seen first."""
     since = (now or datetime.now()) - timedelta(days=days) if days else None
@@ -52,7 +61,7 @@ def summarize(data_dir: Path, users, days: int | None = None, now: datetime | No
         if r is None:
             continue  # a user since deleted
         kind = e.get("kind")
-        if kind in ("login", "visit", "resume", "export"):
+        if kind in ACTIVE_KINDS:
             r["last_seen"] = max(r["last_seen"] or "", e["ts"])
         if kind == "login":
             r["logins"] += 1

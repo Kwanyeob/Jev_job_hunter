@@ -88,6 +88,7 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
             return HTMLResponse(_page(L(request, "이 초대 링크는 유효하지 않습니다. 보낸 사람에게 새 링크를 요청해 주세요.",
                                         "This invite link is not valid. Ask the person who sent it for a new one.")), 403)
         usage.record(data_dir, user.id, "login")
+        scheduler.resume_if_idle(user.id)
         resp = RedirectResponse("/", status_code=303)
         resp.set_cookie(COOKIE, make_session(key, user), max_age=SESSION_DAYS * 86400,
                         httponly=True, secure=secure, samesite="lax")
@@ -100,6 +101,7 @@ def create_app(data_dir: Path, *, scheduler: Scheduler | None = None, hub: Hub |
             return HTMLResponse(_page(L(request, "초대받은 사람만 쓸 수 있습니다. 받은 초대 링크로 접속해 주세요.",
                                         "This site is invite-only. Open it with the invite link you received.")), 401)
         usage.record(data_dir, user.id, "visit")
+        scheduler.resume_if_idle(user.id)
         return HTMLResponse(APP_HTML.read_text(encoding="utf-8"), headers={"Cache-Control": "no-store"})
 
     def state(request: Request):
