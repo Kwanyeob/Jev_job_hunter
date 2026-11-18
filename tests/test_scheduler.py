@@ -225,3 +225,47 @@ def test_user_picks_the_search_interval(setup):
     assert timedelta(hours=3) <= nxt2 - clock.t <= timedelta(hours=4)
     with pytest.raises(ValueError):
         sched.set_every(a.id, "5-10")
+
+
+def _visit(users, uid, at):
+    from jev_job_hunter import usage
+    usage.record(users.data_dir, uid, "visit", at=at)
+
+
+def test_a_user_away_a_week_gets_the_watch_paused_until_they_return(setup):
+    users, sched, clock, sites, pauses, hub = setup
+    a, b = add_user(users, "A"), add_user(users, "B")
+    clock.t = datetime.now() + timedelta(days=1)  # invite dates are real time; start just after them
+    _visit(users, a.id, clock.t)
+    _visit(users, b.id, clock.t)
+    sched.set_enabled(a.id, True)
+    sched.set_enabled(b.id, True)
+    clock.t += timedelta(days=8)
+    _visit(users, b.id, clock.t - timedelta(days=1))  # B was here yesterday, A a week+ ago
+
+    ran = [sched.step(), sched.step()]  # whichever is more overdue comes up first
+    assert sorted(ran, key=str) == sorted([None, b.id], key=str) and len(pauses) == 1  # only B ran
+    s = sched.schedule(a.id)
+    assert (s["enabled"], s["next_run"], s["next_read"]) == (False, None, None) and s["idle_off"]
+    assert "paused" in hub.since(a.id, 0)[-1]["data"]["msg"]
+    assert a.id not in sites and b.id in sites
+
+    assert sched.resume_if_idle(a.id)  # A comes back
+    s = sched.schedule(a.id)
+    assert s["enabled"] and s["next_run"] and "idle_off" not in s
+    assert not sched.resume_if_idle(a.id)
+
+
+def test_a_user_who_turned_the_watch_off_is_not_turned_on_by_a_visit(setup):
+    users, sched, clock, *_ = setup
+    a = add_user(users, "A")
+    sched.set_enabled(a.id, False)
+    assert not sched.resume_if_idle(a.id) and not sched.schedule(a.id)["enabled"]
+
+
+def test_search_now_still_runs_for_an_idle_user(setup):
+    users, sched, clock, sites, *_ = setup
+    a = add_user(users, "A")
+    clock.t = datetime.now() + timedelta(days=30)
+    sched.run_now(a.id)
+    assert sched.step() == a.id

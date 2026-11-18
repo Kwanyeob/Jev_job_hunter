@@ -8,6 +8,8 @@ and seems to allow that many again after ~10 quiet minutes):
 - read: while that queue is not empty, every 8–14 min, read and Jev-score the next 5 postings.
 A manual "search now" with the watch off reads 5 straight away instead, since no reads follow.
 Timing is kept in data/users/<id>/state/schedule.json so a restart picks up where it left off.
+A user who hasn't opened the app for IDLE_OFF_DAYS has the watch paused ("idle_off"); their next
+visit turns it back on, so LinkedIn and Jev aren't spent on results nobody looks at.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ EVERY_OPTIONS = {"30-60": (30.0, 60.0), "60-120": (60.0, 120.0), "180-240": (180
 MAX_QUERIES = 3              # per user, so the operator's Jev quota and LinkedIn stay comfortable
 MAX_OPEN = 5                 # postings read per run; the rest wait in the queue (fewer 429s)
 STATE_KEY = "web"            # one watch state per user, kept across profile edits
+IDLE_OFF_DAYS = 7           # a user away this long gets their watch paused until they come back
 EVENTS_KEPT = 500
 IDLE_POLL = 30.0
 
@@ -127,9 +130,40 @@ class Scheduler:
                 s["next_run"] = None
             if not on:
                 s["next_read"] = None
+            s.pop("idle_off", None)  # the user's own choice replaces an idle pause
             self._save(uid, s)
         self.wake.set()
         return s
+
+    def _away_since(self, uid: str) -> datetime | None:
+        """Last time the person was in the app; the invite date stands in before any visit is logged."""
+        seen = usage.last_seen(self.users.data_dir, uid)
+        user = next((u for u in self.users.all() if u.id == uid), None)
+        created = datetime.strptime(user.created, "%Y-%m-%d %H:%M") if user else None
+        return max((t for t in (seen, created) if t), default=None)
+
+    def pause_if_idle(self, uid: str, now: datetime) -> bool:
+        """Turn the watch off for a user away IDLE_OFF_DAYS or more. True when it did."""
+        since = self._away_since(uid)
+        if since is None or now - since < timedelta(days=IDLE_OFF_DAYS):
+            return False
+        with self.lock:
+            s = self.schedule(uid)
+            if not s["enabled"]:
+                return False
+            s.update(enabled=False, next_run=None, next_read=None, manual=False,
+                     idle_off=now.isoformat(timespec="seconds"))
+            self._save(uid, s)
+        usage.record(self.users.data_dir, uid, "idle_off", at=now, away_since=since.isoformat(timespec="seconds"))
+        self.hub.emit(uid, "status", {"msg": f"Watch paused: no visit for {IDLE_OFF_DAYS} days"})
+        return True
+
+    def resume_if_idle(self, uid: str) -> bool:
+        """The user is back: turn a watch that was paused for being idle on again."""
+        if not self.schedule(uid).get("idle_off"):
+            return False
+        self.set_enabled(uid, True)
+        return True
 
     def run_now(self, uid: str) -> dict:
         with self.lock:
@@ -250,6 +284,8 @@ class Scheduler:
         now = self.clock()
         due = self.due(now)
         if due:
+            if not self.schedule(due[0])["manual"] and self.pause_if_idle(due[0], now):
+                return None  # nothing ran, so no gap is owed; the next step picks the next user
             kind = self._due_kind(due[0], now)
             self.run_one(due[0], kind)
             self.pause(self.rng.uniform(*(READ_COOLDOWN if kind == "read" else self.gap)))
